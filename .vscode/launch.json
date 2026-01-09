@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Lancer Rust-PuTTY",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--package", "putty-rust" 
+                ],
+                "filter": {
+                    "name": "putty-rust",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
