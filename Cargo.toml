@@ -10,3 +10,6 @@ russh-keys = "0.40"
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 rpassword = "7.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+directories = "5.0" # Pour trouver le dossier "AppData" ou ".config" proprement

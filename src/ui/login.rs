@@ -2,6 +2,7 @@
 use iced::widget::{column, container, row, scrollable, text, text_input, button};
 use iced::{Alignment, Element, Length, Border, Padding};
 use crate::ui::{COLOR_ACCENT, COLOR_BG, COLOR_PROMPT, COLOR_TEXT, ID_IP, ID_PASS, ID_PORT, ID_USER, Message, MyApp, SCROLLABLE_ID};
+use iced::Task;
 
 pub fn view(app: &MyApp) -> Element<'_, Message> {
         container(
@@ -46,3 +47,26 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
         .center_y(Length::Fill)
         .into()
     }
+
+
+pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
+    match message {
+        Message::InputIP(ip) => app.ip = ip,
+        Message::InputPort(port) => app.port = port,
+        Message::InputUsername(u) => app.username = u,
+        Message::InputPass(p) => app.password = p,
+        Message::TabPressed => {
+            app.focus_index = (app.focus_index + 1) % 4;
+            let target_id = match app.focus_index {
+                0 => crate::ui::ID_IP,
+                1 => ID_PORT,
+                2 => ID_USER,
+                3 => ID_PASS,
+                _ => crate::ui::ID_IP,
+            };
+            return text_input::focus(text_input::Id::new(target_id));
+        }
+        _ => {}
+    }
+    Task::none()
+}

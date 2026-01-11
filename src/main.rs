@@ -1,5 +1,6 @@
 mod ssh;
 mod ui;
+mod config;
 
 use iced::{keyboard, window};
 use ui::{Message, MyApp};
@@ -42,5 +43,4 @@ pub fn main() -> iced::Result {
             
             (MyApp::new(id), task.discard())
         })
-    // .run() est la toute dernière étape, elle retourne le Result
 }
