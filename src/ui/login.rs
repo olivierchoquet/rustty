@@ -1,8 +1,8 @@
-/***** Contient uniquement la vue du formulaire de connexion  ******/
 use iced::widget::{column, container, row, scrollable, text, text_input, button};
 use iced::{Alignment, Element, Length, Border, Padding};
-use crate::ui::{COLOR_ACCENT, COLOR_BG, COLOR_PROMPT, COLOR_TEXT, ID_IP, ID_PASS, ID_PORT, ID_USER, Message, MyApp, SCROLLABLE_ID};
+use crate::ui::{ID_IP, ID_PASS, ID_PORT, ID_USER, Message, MyApp};
 use iced::Task;
+use crate::ui::theme;
 
 pub fn view(app: &MyApp) -> Element<'_, Message> {
         container(
@@ -15,28 +15,33 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
                         .id(text_input::Id::new(ID_IP))
                         .on_input(Message::InputIP)
                         .padding(10)
-                        .width(Length::FillPortion(3)),
+                        .width(Length::FillPortion(3))
+                        .style(theme::input_style),
                     text_input("Port", &app.port)
                         .id(text_input::Id::new(ID_PORT))
                         .on_input(Message::InputPort)
                         .padding(10)
-                        .width(Length::FillPortion(1)),
+                        .width(Length::FillPortion(1))
+                        .style(theme::input_style),
                 ]
                 .spacing(10),
                 text_input("Utilisateur", &app.username)
                     .id(text_input::Id::new(ID_USER))
                     .on_input(Message::InputUsername)
-                    .padding(10),
+                    .padding(10)
+                    .style(theme::input_style),
                 text_input("Mot de passe", &app.password)
                     .id(text_input::Id::new(ID_PASS))
                     .on_input(Message::InputPass)
                     .secure(true)
                     .padding(10)
+                    .style(theme::input_style)
                     .on_submit(Message::ButtonConnection), // Entrée ici lance la connexion
                 button("Démarrer la session SSH")
                     .on_press(Message::ButtonConnection)
                     .padding(12)
-                    .width(Length::Fill),
+                    .width(Length::Fill)
+                    .style(theme::button_style),
                 scrollable(text(&app.logs).size(13)).height(Length::Fill)
             ]
             .spacing(15)
@@ -45,6 +50,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
         )
         .center_x(Length::Fill)
         .center_y(Length::Fill)
+        .style(theme::main_container_style)
         .into()
     }
 

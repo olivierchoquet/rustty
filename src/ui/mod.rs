@@ -1,22 +1,19 @@
-/***** Contient la structure MyApp et la logique update  ******/
-
 // iced::futures::SinkExt est nécessaire pour l'envoi asynchrone de messages
 use iced::futures::SinkExt;
-// Importation des widgets et types nécessaires d'iced
 use iced::widget::text_input;
-// Importation des types de base d'iced
 use iced::{Element, Task, window};
 use russh::client;
 // Importation des types pour la gestion de la concurrence
 use std::sync::Arc;
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
+// Mes modules internes
 use crate::config::AppConfig;
-// Importation des mon module
 use crate::ssh::{MyHandler, SshChannel};
 
 pub mod login;
 pub mod terminal;
+pub mod theme;
 
 // Identifiant unique pour le widget scrollable du terminal
 pub const SCROLLABLE_ID: &str = "terminal_scroll";
@@ -25,10 +22,18 @@ pub const SCROLLABLE_ID: &str = "terminal_scroll";
 const MAX_TERMINAL_LINES: usize = 1000;
 
 // --- DÉFINITION DES COULEURS PERSONNALISÉES POUR LA FENETRE TERMINAL---
-pub const COLOR_BG: iced::Color = iced::Color::from_rgb(0.05, 0.07, 0.1); // Bleu-nuit profond
-pub const COLOR_ACCENT: iced::Color = iced::Color::from_rgb(0.0, 0.5, 1.0); // Bleu Windows
-pub const COLOR_TEXT: iced::Color = iced::Color::from_rgb(0.9, 0.9, 0.9); // Blanc cassé
-pub const COLOR_PROMPT: iced::Color = iced::Color::from_rgb(0.2, 0.8, 0.4); // Vert émeraude
+//pub const COLOR_BG: iced::Color = iced::Color::from_rgb(0.05, 0.07, 0.1); // Bleu-nuit profond
+//pub const COLOR_ACCENT: iced::Color = iced::Color::from_rgb(0.0, 0.5, 1.0); // Bleu Windows
+//pub const COLOR_TEXT: iced::Color = iced::Color::from_rgb(0.9, 0.9, 0.9); // Blanc cassé
+//pub const COLOR_PROMPT: iced::Color = iced::Color::from_rgb(0.2, 0.8, 0.4); // Vert émeraude
+
+// Dans ui/mod.rs
+//pub const COLOR_BG: iced::Color = iced::Color::from_rgb(0.11, 0.12, 0.15); // Gris très sombre
+//pub const COLOR_SURFACE: iced::Color = iced::Color::from_rgb(0.16, 0.18, 0.22); // Gris moyen pour les inputs
+//pub const COLOR_ACCENT: iced::Color = iced::Color::from_rgb(0.0, 0.47, 0.85); // Bleu Windows/VSCode
+//pub const COLOR_SUCCESS: iced::Color = iced::Color::from_rgb(0.3, 0.8, 0.4); // Vert terminal
+//pub const COLOR_TEXT: iced::Color = iced::Color::from_rgb(0.9, 0.9, 0.9);
+
 
 // Identifiants pour le focus - touche tabulation
 pub const ID_IP: &str = "ip_input";
