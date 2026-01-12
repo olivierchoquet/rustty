@@ -1,10 +1,12 @@
 use iced::widget::{column, container, row, scrollable, text, text_input, button};
-use iced::{Alignment, Element, Length, Border, Padding};
+use iced::{Element, Length};
 use crate::ui::{ID_IP, ID_PASS, ID_PORT, ID_USER, Message, MyApp};
 use iced::Task;
 use crate::ui::theme;
 
 pub fn view(app: &MyApp) -> Element<'_, Message> {
+    // 1. On récupère les couleurs du thème choisi dans MyApp
+    let colors = app.theme_choice.get_colors();
         container(
             column![
                 text("Rust-PuTTY Login")
@@ -16,32 +18,33 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
                         .on_input(Message::InputIP)
                         .padding(10)
                         .width(Length::FillPortion(3))
-                        .style(theme::input_style),
+                        // Utilisation de move pour passer les couleurs,
+                        .style(move |t, s| theme::input_style(colors, s)), 
                     text_input("Port", &app.port)
                         .id(text_input::Id::new(ID_PORT))
                         .on_input(Message::InputPort)
                         .padding(10)
                         .width(Length::FillPortion(1))
-                        .style(theme::input_style),
+                        .style(move |t, s| theme::input_style(colors, s))
                 ]
                 .spacing(10),
                 text_input("Utilisateur", &app.username)
                     .id(text_input::Id::new(ID_USER))
                     .on_input(Message::InputUsername)
                     .padding(10)
-                    .style(theme::input_style),
+                    .style(move |t, s| theme::input_style(colors, s)),
                 text_input("Mot de passe", &app.password)
                     .id(text_input::Id::new(ID_PASS))
                     .on_input(Message::InputPass)
                     .secure(true)
                     .padding(10)
-                    .style(theme::input_style)
+                    .style(move |t, s| theme::input_style(colors, s))
                     .on_submit(Message::ButtonConnection), // Entrée ici lance la connexion
                 button("Démarrer la session SSH")
                     .on_press(Message::ButtonConnection)
                     .padding(12)
                     .width(Length::Fill)
-                    .style(theme::button_style),
+                    .style(move |theme, status| theme::button_style(colors, status)),
                 scrollable(text(&app.logs).size(13)).height(Length::Fill)
             ]
             .spacing(15)
@@ -50,7 +53,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
         )
         .center_x(Length::Fill)
         .center_y(Length::Fill)
-        .style(theme::main_container_style)
+        .style(move |_| theme::main_container_style(colors))
         .into()
     }
 

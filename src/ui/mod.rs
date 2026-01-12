@@ -10,6 +10,8 @@ use tokio::sync::Mutex;
 // Mes modules internes
 use crate::config::AppConfig;
 use crate::ssh::{MyHandler, SshChannel};
+use crate::ui::theme::ThemeChoice;
+
 
 pub mod login;
 pub mod terminal;
@@ -61,6 +63,7 @@ pub enum Message {
     HistoryNext,
     TabPressed,
     WindowOpened(window::Id),
+    ThemeSelected(ThemeChoice),
 }
 
 // Implémentation de Debug pour Message pour faciliter le débogage
@@ -83,6 +86,7 @@ pub struct MyApp {
     pub history: Vec<String>,   // Liste des commandes passées
     pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
+    pub theme_choice: ThemeChoice
 }
 
 impl MyApp {
@@ -102,6 +106,7 @@ impl MyApp {
             history: Vec::new(),
             history_index: None,
             focus_index: 0,
+            theme_choice: ThemeChoice::Slate, 
         }
     }
 
@@ -224,7 +229,8 @@ impl MyApp {
             | Message::HistoryNext
             | Message::SendCommand
             | Message::SetChannel(_)
-            | Message::InputTerminal(_) => terminal::update(self, message),
+            | Message::InputTerminal(_) 
+            | Message::ThemeSelected(_)=> terminal::update(self, message),
 
             // Gestion globale (Fenêtres)
             Message::TerminalWindowOpened(id) => {
