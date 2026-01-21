@@ -21,20 +21,6 @@ pub const SCROLLABLE_ID: &str = "terminal_scroll";
 // usize est le type pour les tailles et indices non signés qui s'adapte à l'architecture (32 ou 64 bits)
 const MAX_TERMINAL_LINES: usize = 1000;
 
-// --- DÉFINITION DES COULEURS PERSONNALISÉES POUR LA FENETRE TERMINAL---
-//pub const COLOR_BG: iced::Color = iced::Color::from_rgb(0.05, 0.07, 0.1); // Bleu-nuit profond
-//pub const COLOR_ACCENT: iced::Color = iced::Color::from_rgb(0.0, 0.5, 1.0); // Bleu Windows
-//pub const COLOR_TEXT: iced::Color = iced::Color::from_rgb(0.9, 0.9, 0.9); // Blanc cassé
-//pub const COLOR_PROMPT: iced::Color = iced::Color::from_rgb(0.2, 0.8, 0.4); // Vert émeraude
-
-// Dans ui/mod.rs
-//pub const COLOR_BG: iced::Color = iced::Color::from_rgb(0.11, 0.12, 0.15); // Gris très sombre
-//pub const COLOR_SURFACE: iced::Color = iced::Color::from_rgb(0.16, 0.18, 0.22); // Gris moyen pour les inputs
-//pub const COLOR_ACCENT: iced::Color = iced::Color::from_rgb(0.0, 0.47, 0.85); // Bleu Windows/VSCode
-//pub const COLOR_SUCCESS: iced::Color = iced::Color::from_rgb(0.3, 0.8, 0.4); // Vert terminal
-//pub const COLOR_TEXT: iced::Color = iced::Color::from_rgb(0.9, 0.9, 0.9);
-
-
 // Identifiants pour le focus - touche tabulation
 pub const ID_IP: &str = "ip_input";
 pub const ID_PORT: &str = "port_input";

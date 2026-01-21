@@ -62,6 +62,7 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
         Message::InputUsername(u) => app.username = u,
         Message::InputPass(p) => app.password = p,
         Message::TabPressed => {
+            // Gérer la navigation par Tab entre les champs de saisie
             app.focus_index = (app.focus_index + 1) % 4;
             let target_id = match app.focus_index {
                 0 => crate::ui::ID_IP,
