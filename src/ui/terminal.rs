@@ -12,7 +12,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
         row![
             // Onglet actif
             container(
-                text(format!(" 🐚 {} ", &app.ip))
+                text(format!(" 🐚 {} ", &app.current_session.ip))
                     .size(13)
                     .font(iced::Font::MONOSPACE)
                     .color(colors.text)
@@ -95,7 +95,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
     let prompt_line = container(
         row![
             container(
-                text(format!(" {} ", app.username))
+                text(format!(" {} ", app.current_session.username))
                     .size(12)
                     .color(colors.bg)
                     .font(iced::Font::MONOSPACE)

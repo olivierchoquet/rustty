@@ -83,9 +83,9 @@ impl std::fmt::Display for Session {
 
 
 pub struct MyApp {
-    pub ip: String,
-    pub port: String,
-    pub username: String,
+    //pub ip: String,
+    //pub port: String,
+    //pub username: String,
     pub password: String,
     pub logs: String, // Contient tout le texte affiché dans le terminal
     pub login_window_id: Option<window::Id>,
@@ -109,9 +109,6 @@ impl MyApp {
         //Récupération de la configuration sauvegardée
         let config = AppConfig::load();
         Self {
-            ip: config.last_ip.into(),
-            port: config.last_port.into(),
-            username: config.last_username.into(),
             password: "".into(),
             logs: String::from("Prêt...\n"),
             login_window_id: Some(login_id),
@@ -126,9 +123,9 @@ impl MyApp {
             selected_session: None,
             current_session: Session {
                 name: "".into(),
-                ip: "".into(),
-                port: "22".into(),
-                username: "".into(),
+                ip: config.last_ip.into(),
+                port: config.last_port.into(),
+                username: config.last_username.into(),
                 group: "DEFAUT".into(),
             },
             search_query: "".into(),
@@ -136,10 +133,10 @@ impl MyApp {
     }
 
     fn perform_ssh_connection(&self) -> Task<Message> {
-        let host = self.ip.clone();
-        let user = self.username.clone();
+        let host = self.current_session.ip.clone();
+        let user = self.current_session.username.clone();
         let pass = self.password.clone();
-        let port = self.port.parse::<u16>().unwrap_or(22);
+        let port = self.current_session.port.parse::<u16>().unwrap_or(22);
 
         Task::stream(iced::stream::channel(100, move |mut output| async move {
             let config = Arc::new(client::Config::default());
@@ -229,9 +226,9 @@ impl MyApp {
             Message::ButtonConnection => {
                 // On prépare la sauvegarde
                 let config = AppConfig {
-                    last_ip: self.ip.clone(),
-                    last_username: self.username.clone(),
-                    last_port: self.port.clone(),
+                    last_ip: self.current_session.ip.clone(),
+                    last_username: self.current_session.username.clone(),
+                    last_port: self.current_session.port.clone(),
                 };
                 config.save(); // On écrit sur le disque
                 self.perform_ssh_connection()

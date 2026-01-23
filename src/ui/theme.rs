@@ -1,4 +1,4 @@
-use iced::widget::{button, container, pick_list, text_input};
+use iced::widget::{button, container, text_input};
 use iced::{Border, Color, Shadow};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -182,7 +182,6 @@ pub struct TerminalColors {
     pub prompt: Color,
     pub accent: Color,
     pub surface: Color,
-    pub(crate) background: Color,
 }
 
 // --- FONCTIONS DE STYLE ---

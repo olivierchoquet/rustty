@@ -219,9 +219,9 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
 
 pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
     match message {
-        Message::InputIP(ip) => app.ip = ip,
-        Message::InputPort(port) => app.port = port,
-        Message::InputUsername(u) => app.username = u,
+        Message::InputIP(ip) => app.current_session.ip = ip,
+        Message::InputPort(port) => app.current_session.port = port,
+        Message::InputUsername(u) => app.current_session.username = u,
         Message::InputPass(p) => app.password = p,
         Message::TabPressed => {
             // Gérer la navigation par Tab entre les champs de saisie
@@ -236,8 +236,8 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             return text_input::focus(text_input::Id::new(target_id));
         }
         Message::SessionSelected(session) => {
-            app.ip = session.ip.clone();
-            app.username = session.username.clone();
+            app.current_session.ip = session.ip.clone();
+            app.current_session.username = session.username.clone();
             app.selected_session = Some(session);
         }
         Message::InputNewSessionName(name) => {
@@ -250,7 +250,7 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             app.search_query = query;
         }
         Message::SaveSession => {
-            if !app.ip.is_empty() && !app.current_session.name.is_empty() {
+            if !app.current_session.ip.is_empty() && !app.current_session.name.is_empty() {
                 let group = if app.current_session.group.is_empty() {
                     "DEFAUT".to_string()
                 } else {
@@ -259,9 +259,9 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
 
                 let new_session = Session {
                     name: app.current_session.name.clone(),
-                    ip: app.ip.clone(),
-                    port: app.port.clone(),
-                    username: app.username.clone(),
+                    ip: app.current_session.ip.clone(),
+                    port: app.current_session.port.clone(),
+                    username: app.current_session.username.clone(),
                     group,
                 };
                 app.sessions.push(new_session);
@@ -275,8 +275,8 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
                 app.sessions.retain(|s| s != selected);
                 app.selected_session = None;
                 // Optionnel : vider les champs après suppression
-                app.ip.clear();
-                app.username.clear();
+                app.current_session.ip.clear();
+                app.current_session.username.clear();
             }
         }
         _ => {}
