@@ -182,6 +182,7 @@ pub struct TerminalColors {
     pub prompt: Color,
     pub accent: Color,
     pub surface: Color,
+    pub(crate) background: Color,
 }
 
 // --- FONCTIONS DE STYLE ---

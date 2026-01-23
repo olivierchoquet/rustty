@@ -36,7 +36,7 @@ pub fn main() -> iced::Result {
         // 3. On définit comment l'application démarre
         .run_with(|| {
             let (id, task) = window::open(window::Settings {
-                size: iced::Size::new(500.0, 550.0),
+                size: iced::Size::new(500.0, 650.0),
                 ..Default::default()
             });
 

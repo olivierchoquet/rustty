@@ -50,6 +50,12 @@ pub enum Message {
     TabPressed,
     WindowOpened(window::Id),
     ThemeSelected(ThemeChoice),
+    SessionSelected(Session),
+    SaveSession,
+    DeleteSession,
+    InputNewSessionName(String),
+    InputNewSessionGroup(String),
+    SearchChanged(String),
 }
 
 // Implémentation de Debug pour Message pour faciliter le débogage
@@ -58,6 +64,23 @@ impl std::fmt::Debug for Message {
         f.write_str("SshMsg")
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Session {
+    pub name: String,
+    pub ip: String,
+    pub port: String,
+    pub username: String,
+    pub group: String, // Nouveau champ
+}
+
+// L'affichage dans la PickList incluera le groupe pour s'y retrouver
+impl std::fmt::Display for Session {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}] {}", self.group.to_uppercase(), self.name)
+    }
+}
+
 
 pub struct MyApp {
     pub ip: String,
@@ -72,7 +95,13 @@ pub struct MyApp {
     pub history: Vec<String>,   // Liste des commandes passées
     pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
-    pub theme_choice: ThemeChoice
+    pub theme_choice: ThemeChoice,
+    // Gestion des sessions sauvegardées
+    pub selected_session: Option<Session>,
+    pub sessions: Vec<Session>,
+    pub current_session: Session, // Contient name, group, ip, port, username
+    //pub password: String,         // On le garde à part (sécurité)
+    pub search_query: String, // Pour le filtrage global
 }
 
 impl MyApp {
@@ -93,6 +122,16 @@ impl MyApp {
             history_index: None,
             focus_index: 0,
             theme_choice: ThemeChoice::Slate, 
+            sessions: Vec::new(),
+            selected_session: None,
+            current_session: Session {
+                name: "".into(),
+                ip: "".into(),
+                port: "22".into(),
+                username: "".into(),
+                group: "DEFAUT".into(),
+            },
+            search_query: "".into(),
         }
     }
 
@@ -208,6 +247,12 @@ impl MyApp {
             | Message::InputPort(_)
             | Message::InputUsername(_)
             | Message::InputPass(_)
+            | Message::SaveSession
+            | Message::DeleteSession
+            | Message::InputNewSessionName(_)
+            | Message::InputNewSessionGroup(_)
+            | Message::SearchChanged(_)
+            | Message::SessionSelected(_)
             | Message::TabPressed => login::update(self, message),
 
             Message::SshData(_)
