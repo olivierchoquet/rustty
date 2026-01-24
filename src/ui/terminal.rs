@@ -1,4 +1,4 @@
-use crate::ui::theme::{self, ThemeChoice, TerminalColors};
+use crate::ui::theme::{self, ThemeChoice};
 use crate::ui::{MAX_TERMINAL_LINES, Message, MyApp, SCROLLABLE_ID};
 
 use iced::widget::{button, column, container, row, scrollable, text, text_input, pick_list};
@@ -12,7 +12,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
         row![
             // Onglet actif
             container(
-                text(format!(" 🐚 {} ", &app.current_session.ip))
+                text(format!(" 🐚 {} ", &app.current_profile.ip))
                     .size(13)
                     .font(iced::Font::MONOSPACE)
                     .color(colors.text)
@@ -95,7 +95,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
     let prompt_line = container(
         row![
             container(
-                text(format!(" {} ", app.current_session.username))
+                text(format!(" {} ", app.current_profile.username))
                     .size(12)
                     .color(colors.bg)
                     .font(iced::Font::MONOSPACE)

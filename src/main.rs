@@ -1,13 +1,12 @@
 mod ssh;
 mod ui;
-mod config;
 
 use iced::{keyboard, window};
 use ui::{Message, MyApp};
 
 pub fn main() -> iced::Result {
     // 1. On configure le daemon
-    iced::daemon("Rust-PuTTY Pro", MyApp::update, MyApp::view)
+    iced::daemon("RustTy", MyApp::update, MyApp::view)
         // 2. On définit les abonnements (clavier, fenêtres, etc.)
         .subscription(|_| {
             let window_events = window::events().map(|(id, event)| {

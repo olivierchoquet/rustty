@@ -8,7 +8,6 @@ use std::sync::Arc;
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
 // Mes modules internes
-use crate::config::AppConfig;
 use crate::ssh::{MyHandler, SshChannel};
 use crate::ui::theme::ThemeChoice;
 
@@ -16,6 +15,7 @@ use crate::ui::theme::ThemeChoice;
 pub mod login;
 pub mod terminal;
 pub mod theme;
+pub mod components;
 
 // Identifiant unique pour le widget scrollable du terminal
 pub const SCROLLABLE_ID: &str = "terminal_scroll";
@@ -50,12 +50,14 @@ pub enum Message {
     TabPressed,
     WindowOpened(window::Id),
     ThemeSelected(ThemeChoice),
-    SessionSelected(Session),
-    SaveSession,
-    DeleteSession,
-    InputNewSessionName(String),
-    InputNewSessionGroup(String),
+    ProfileSelected(Profile),
+    SaveProfile,
+    DeleteProfile,
+    InputNewProfileName(String),
+    InputNewProfileGroup(String),
     SearchChanged(String),
+    SectionChanged(EditSection),
+    ThemeChanged(ThemeChoice),
 }
 
 // Implémentation de Debug pour Message pour faciliter le débogage
@@ -65,27 +67,35 @@ impl std::fmt::Debug for Message {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct Session {
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub struct Profile {
     pub name: String,
     pub ip: String,
     pub port: String,
     pub username: String,
-    pub group: String, // Nouveau champ
+    pub group: String, 
+    pub theme: ThemeChoice,
 }
 
-// L'affichage dans la PickList incluera le groupe pour s'y retrouver
-impl std::fmt::Display for Session {
+impl std::fmt::Display for Profile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}] {}", self.group.to_uppercase(), self.name)
     }
 }
 
 
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditSection {
+    General,
+    Auth,
+    Network,
+    Advanced,
+    Themes
+}
+
+
 pub struct MyApp {
-    //pub ip: String,
-    //pub port: String,
-    //pub username: String,
     pub password: String,
     pub logs: String, // Contient tout le texte affiché dans le terminal
     pub login_window_id: Option<window::Id>,
@@ -96,18 +106,18 @@ pub struct MyApp {
     pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
     pub theme_choice: ThemeChoice,
-    // Gestion des sessions sauvegardées
-    pub selected_session: Option<Session>,
-    pub sessions: Vec<Session>,
-    pub current_session: Session, // Contient name, group, ip, port, username
+    // Gestion des profils sauvegardées
+    pub selected_profile: Option<Profile>,
+    pub profiles: Vec<Profile>,
+    pub current_profile: Profile, // Contient name, group, ip, port, username
     //pub password: String,         // On le garde à part (sécurité)
     pub search_query: String, // Pour le filtrage global
+    // Catégorie de parammètres en cours d'édition
+    pub active_section: EditSection,
 }
 
 impl MyApp {
     pub fn new(login_id: window::Id) -> Self {
-        //Récupération de la configuration sauvegardée
-        let config = AppConfig::load();
         Self {
             password: "".into(),
             logs: String::from("Prêt...\n"),
@@ -119,24 +129,27 @@ impl MyApp {
             history_index: None,
             focus_index: 0,
             theme_choice: ThemeChoice::Slate, 
-            sessions: Vec::new(),
-            selected_session: None,
-            current_session: Session {
+            // chargement des profils sauvegardées
+            profiles: MyApp::load_profiles(),
+            selected_profile: None,
+            current_profile: Profile {
                 name: "".into(),
-                ip: config.last_ip.into(),
-                port: config.last_port.into(),
-                username: config.last_username.into(),
-                group: "DEFAUT".into(),
+                ip: "".into(),
+                port: "".into(),
+                username: "".into(),
+                group: "".into(),
+                theme: ThemeChoice::Slate,
             },
             search_query: "".into(),
+            active_section: EditSection::General,
         }
     }
 
     fn perform_ssh_connection(&self) -> Task<Message> {
-        let host = self.current_session.ip.clone();
-        let user = self.current_session.username.clone();
+        let Profile = self.current_profile.ip.clone();
+        let user = self.current_profile.username.clone();
         let pass = self.password.clone();
-        let port = self.current_session.port.parse::<u16>().unwrap_or(22);
+        let port = self.current_profile.port.parse::<u16>().unwrap_or(22);
 
         Task::stream(iced::stream::channel(100, move |mut output| async move {
             let config = Arc::new(client::Config::default());
@@ -144,7 +157,7 @@ impl MyApp {
                 sender: output.clone(),
             };
 
-            if let Ok(mut handle) = client::connect(config, (host.as_str(), port), handler).await {
+            if let Ok(mut handle) = client::connect(config, (Profile.as_str(), port), handler).await {
                 if handle
                     .authenticate_password(user, pass)
                     .await
@@ -224,13 +237,6 @@ impl MyApp {
         match message {
             // Actions de haut niveau (isolées dans des méthodes)
             Message::ButtonConnection => {
-                // On prépare la sauvegarde
-                let config = AppConfig {
-                    last_ip: self.current_session.ip.clone(),
-                    last_username: self.current_session.username.clone(),
-                    last_port: self.current_session.port.clone(),
-                };
-                config.save(); // On écrit sur le disque
                 self.perform_ssh_connection()
             }
             Message::SshConnected(Ok(handle)) => self.open_terminal(handle),
@@ -244,12 +250,14 @@ impl MyApp {
             | Message::InputPort(_)
             | Message::InputUsername(_)
             | Message::InputPass(_)
-            | Message::SaveSession
-            | Message::DeleteSession
-            | Message::InputNewSessionName(_)
-            | Message::InputNewSessionGroup(_)
+            | Message::SaveProfile
+            | Message::DeleteProfile
+            | Message::InputNewProfileName(_)
+            | Message::InputNewProfileGroup(_)
             | Message::SearchChanged(_)
-            | Message::SessionSelected(_)
+            | Message::ProfileSelected(_)
+            | Message::SectionChanged(_)
+            | Message::ThemeChanged(_)
             | Message::TabPressed => login::update(self, message),
 
             Message::SshData(_)
@@ -288,4 +296,22 @@ impl MyApp {
             login::view(self)
         }
     }
+
+    // Sauvegarder la liste sur le disque
+    pub fn save_profiles(&self) {
+        if let Ok(json) = serde_json::to_string_pretty(&self.profiles) {
+            let _ = std::fs::write("profiles.json", json);
+        }
+    }
+
+    // Charger la liste au démarrage
+    pub fn load_profiles() -> Vec<Profile> {
+        if let Ok(data) = std::fs::read_to_string("profiles.json") {
+            if let Ok(profiles) = serde_json::from_str(&data) {
+                return profiles;
+            }
+        }
+        Vec::new() // Retourne une liste vide si le fichier n'existe pas
+    }
+
 }

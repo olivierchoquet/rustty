@@ -207,22 +207,20 @@ pub fn input_style(colors: TerminalColors, status: text_input::Status) -> text_i
 }
 
 pub fn button_style(colors: TerminalColors, status: button::Status) -> button::Style {
-    let base_color = match status {
-        button::Status::Hovered => Color {
-            a: 0.8,
-            ..colors.accent
-        },
-        _ => colors.accent,
+    // On définit une opacité différente au survol
+    let bg_color = match status {
+        button::Status::Hovered => colors.accent,
+        _ => Color { a: 0.9, ..colors.accent },
     };
 
     button::Style {
-        background: Some(base_color.into()),
-        text_color: colors.bg,
+        background: Some(bg_color.into()),
+        text_color: colors.bg, // Texte contrasté (souvent noir/sombre) sur le bouton "Accent"
         border: Border {
             radius: 6.0.into(),
             ..Default::default()
         },
-        ..Default::default()
+        shadow: Shadow::default(),
     }
 }
 
