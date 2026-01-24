@@ -3,22 +3,26 @@
 3. cargo run
 4. extensions vscode : rust-analyzer et CodeLLDB
 
+## Structure du Projet
+
+```text
 rustty/
 ├── Cargo.toml             # Dépendances (iced, serde, etc.)
 └── src/
-    ├── main.rs            # Point d'entrée, configuration de la fenêtre
-    ├── config.rs          # Gestion du JSON (chargement/sauvegarde)
+    ├── main.rs            # Point d'entrée
+    ├── config.rs          # Gestion du JSON
     └── ui/
-        ├── mod.rs         # Déclare MyApp, Message et les modules enfants
-        ├── login.rs       # LE CHEF D'ORCHESTRE (La fonction view principale)
-        ├── theme.rs       # Définition des couleurs et styles (TokyoNight, etc.)
-        └── components/    # ÉLÉMENTS VISUELS RÉUTILISABLES
-            ├── mod.rs     # Index des composants
-            ├── table.rs   # Logique du tableau Zebra (header + lignes)
-            ├── sidebar.rs # Barre de navigation latérale
-            └── forms/     # DOSSIER DES FORMULAIRES
-                ├── mod.rs # Index des formulaires
-                ├── general.rs # Champs : Nom, IP, Port
-                ├── auth.rs    # Champs : User, Password
-                └── themes.rs  # Grille de sélection des thèmes
+        ├── mod.rs         # Déclaration des modules UI
+        ├── login.rs       # Vue principale
+        ├── theme.rs       # Thèmes et styles
+        └── components/    
+            ├── mod.rs     
+            ├── table.rs   
+            ├── sidebar.rs 
+            └── forms/     
+                ├── mod.rs 
+                ├── general.rs
+                ├── auth.rs    
+                └── themes.rs  
+```
 
