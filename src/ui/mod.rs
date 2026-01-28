@@ -12,10 +12,10 @@ use crate::ssh::{MyHandler, SshChannel};
 use crate::ui::theme::ThemeChoice;
 
 
-pub mod login;
 pub mod terminal;
 pub mod theme;
 pub mod components;
+pub mod views;
 
 // Identifiant unique pour le widget scrollable du terminal
 pub const SCROLLABLE_ID: &str = "terminal_scroll";
@@ -58,6 +58,7 @@ pub enum Message {
     SearchChanged(String),
     SectionChanged(EditSection),
     ThemeChanged(ThemeChoice),
+    QuitRequested,
 }
 
 // Implémentation de Debug pour Message pour faciliter le débogage
@@ -257,8 +258,8 @@ impl MyApp {
             | Message::SearchChanged(_)
             | Message::ProfileSelected(_)
             | Message::SectionChanged(_)
-            | Message::ThemeChanged(_)
-            | Message::TabPressed => login::update(self, message),
+            | Message::ThemeChanged(_),
+          //  | Message::TabPressed => login::update(self, message),
 
             Message::SshData(_)
             | Message::HistoryPrev

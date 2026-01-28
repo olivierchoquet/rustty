@@ -1,3 +1,4 @@
+use crate::ui::components::sidebar;
 use crate::ui::theme::{self, TerminalColors, ThemeChoice};
 use crate::ui::{EditSection, ID_IP, ID_PASS, ID_PORT, ID_USER, Message, MyApp, Profile};
 use iced::font::Weight;
@@ -10,39 +11,11 @@ use crate::ui::components::table::{table_content, table_header};
 pub fn view(app: &MyApp) -> Element<'_, Message> {
     let colors = app.theme_choice.get_colors();
 
-    // --- 1. SIDEBAR (LOGIQUE FIXE) ---
-    let sidebar = container(
-        column![
-            text("NAVIGATION")
-                .size(14)
-                .color(colors.accent)
-                .font(iced::Font {
-                    weight: Weight::Bold,
-                    ..Font::DEFAULT
-                }),
-            vertical_space().height(10),
-            nav_button("Général", EditSection::General, app.active_section, colors),
-            nav_button("Sécurité", EditSection::Auth, app.active_section, colors),
-            nav_button("Réseum", EditSection::Network, app.active_section, colors),
-            vertical_space().height(Length::Fill),
-            nav_button("Avancé", EditSection::Advanced, app.active_section, colors),
-            nav_button("Thèmes", EditSection::Themes, app.active_section, colors),
-            button(text("Quitter").center())
-                .width(Length::Fill)
-                .padding(10)
-                .style(move |t, s| theme::button_style(colors, s)),
-        ]
-        .spacing(10)
-        .padding(15),
-    )
-    .width(Length::Fixed(200.0))
-    .height(Length::Fill)
-    .style(move |_| container::Style {
-        background: Some(colors.surface.into()),
-        ..Default::default()
-    });
+    // 1. Appel du composant Sidebar
+    let side_menu = sidebar::render(app.active_section, colors);
+   
 
-    // --- 2. LOGO "RustTy" (TOUJOURS VISIBLE) ---
+    // 2. LOGO "RustTy"
     let brand_header = column![
         row![
             text("Rust").size(35).font(iced::Font {
@@ -67,7 +40,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
     ]
     .spacing(2);
 
-    // --- 3. CONTENU DYNAMIQUE (SELON L'ONGLET) ---
+    // 3. CONTENU DYNAMIQUE (SELON L'ONGLET) ---
     let dynamic_content: Element<_> = match app.active_section {
         EditSection::General => {
             column![
@@ -101,7 +74,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
 
     // --- 4. ASSEMBLAGE FINAL ---
     row![
-        sidebar,
+        side_menu,
         container(column![brand_header, vertical_space().height(10), dynamic_content,].spacing(20))
             .padding(25)
             .width(Length::Fill)
@@ -114,39 +87,6 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
 }
 
 // --- LES FONCTIONS HELPERS ---
-
-fn nav_button<'a>(
-    label: &'a str,
-    section: EditSection,
-    active: EditSection,
-    colors: TerminalColors,
-) -> button::Button<'a, Message> {
-    let is_active = section == active;
-
-    button(text(label).width(Length::Fill).center())
-        .on_press(Message::SectionChanged(section))
-        .padding(10)
-        .style(move |_, status| {
-            // 1. On récupère le style de base
-            let mut s = theme::button_style(colors, status);
-
-            // 2. ON ÉCRASE SYSTÉMATIQUEMENT SI ACTIF
-            if is_active {
-                s.background = Some(colors.accent.into());
-                s.text_color = iced::Color::BLACK;
-                s.border = Border {
-                    color: colors.accent,
-                    width: 1.0,
-                    radius: 5.0.into(),
-                };
-            } else {
-                // Optionnel: on peut aussi forcer le style inactif ici
-                s.background = Some(colors.surface.into());
-                s.text_color = iced::Color::WHITE;
-            }
-            s
-        })
-}
 
 fn general_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Message> {
     column![
