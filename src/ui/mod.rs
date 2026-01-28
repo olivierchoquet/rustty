@@ -258,8 +258,8 @@ impl MyApp {
             | Message::SearchChanged(_)
             | Message::ProfileSelected(_)
             | Message::SectionChanged(_)
-            | Message::ThemeChanged(_),
-          //  | Message::TabPressed => login::update(self, message),
+            | Message::ThemeChanged(_)
+            | Message::TabPressed => crate::ui::views::login::update(self, message),
 
             Message::SshData(_)
             | Message::HistoryPrev
@@ -294,7 +294,8 @@ impl MyApp {
             terminal::view(self)
         } else {
             // On délègue le dessin au module login
-            login::view(self)
+            //login::view(self)
+            crate::ui::views::login::render(self)
         }
     }
 

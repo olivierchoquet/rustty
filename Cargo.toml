@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = { version = "0.13", features = ["tokio", "multi-window"] }
+iced = { version = "0.13", features = ["tokio", "multi-window", "image"] }
 russh = "0.45.0"
 russh-keys = "0.40"
 tokio = { version = "1", features = ["full"] }

@@ -4,14 +4,14 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Lancer Rust-PuTTY",
+            "name": "Lancer RustTY",
             "cargo": {
                 "args": [
                     "run",
-                    "--package", "putty-rust" 
+                    "--package", "rustty" 
                 ],
                 "filter": {
-                    "name": "putty-rust",
+                    "name": "rustty",
                     "kind": "bin"
                 }
             },

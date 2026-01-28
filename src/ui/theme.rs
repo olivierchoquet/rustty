@@ -206,6 +206,16 @@ pub fn input_style(colors: TerminalColors, status: text_input::Status) -> text_i
     }
 }
 
+pub fn main_container_style(colors: TerminalColors) -> container::Style {
+    container::Style {
+        background: Some(colors.bg.into()),
+        text_color: Some(colors.text),
+        ..Default::default()
+    }
+}
+
+// Style standard pour les boutons (Sauvegarder, Annuler, etc.)
+
 pub fn button_style(colors: TerminalColors, status: button::Status) -> button::Style {
     // On définit une opacité différente au survol
     let bg_color = match status {
@@ -224,10 +234,26 @@ pub fn button_style(colors: TerminalColors, status: button::Status) -> button::S
     }
 }
 
-pub fn main_container_style(colors: TerminalColors) -> container::Style {
-    container::Style {
-        background: Some(colors.bg.into()),
-        text_color: Some(colors.text),
+
+
+// Style "Accent" pour les actions principales (Démarrer SSH)
+pub fn active_button_style(colors: TerminalColors, status: iced::widget::button::Status) -> iced::widget::button::Style {
+    let base = iced::widget::button::Style {
+        background: Some(iced::Background::Color(colors.accent)),
+        text_color: colors.bg, // Texte sombre sur fond brillant
+        border: iced::Border {
+            color: colors.accent,
+            width: 1.0,
+            radius: 5.0.into(),
+        },
         ..Default::default()
+    };
+
+    match status {
+        iced::widget::button::Status::Hovered => iced::widget::button::Style {
+            background: Some(iced::Background::Color(colors.text)),
+            ..base
+        },
+        _ => base,
     }
 }

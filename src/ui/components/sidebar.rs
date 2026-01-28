@@ -1,10 +1,12 @@
 use iced::widget::{button, column, container, text, vertical_space};
 use iced::{Alignment, Border, Element, Length};
+use crate::ui::components::brand;
 use crate::ui::{Message, EditSection, theme::{self, TerminalColors}};
 
 pub fn render<'a>(active_section: EditSection, colors: TerminalColors) -> Element<'a, Message> {
     container(
         column![
+            brand::logo(),
             text("NAVIGATION")
                 .size(14)
                 .color(colors.accent)

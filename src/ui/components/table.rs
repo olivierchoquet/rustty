@@ -3,7 +3,7 @@ use iced::{Element, Length};
 use crate::ui::theme;
 use crate::ui::{Message, MyApp, theme::TerminalColors};
 
-pub fn table_header<'a>(colors: TerminalColors) -> container::Container<'a, Message> {
+pub fn header<'a>(colors: TerminalColors) -> container::Container<'a, Message> {
     container(
         row![
             text("Groupe")
@@ -40,7 +40,7 @@ pub fn table_header<'a>(colors: TerminalColors) -> container::Container<'a, Mess
 
 // On ajoute &'a avant MyApp pour dire :
 // "L'app doit vivre au moins aussi longtemps que l'élément UI produit"
-pub fn table_content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
+pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     let mut content = column![].spacing(1);
     let query = app.search_query.to_lowercase();
 

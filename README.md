@@ -6,23 +6,11 @@
 ## Structure du Projet
 
 ```text
-rustty/
-├── Cargo.toml             # Dépendances (iced, serde, etc.)
-└── src/
-    ├── main.rs            # Point d'entrée
-    ├── config.rs          # Gestion du JSON
-    └── ui/
-        ├── mod.rs         # Déclaration des modules UI
-        ├── login.rs       # Vue principale
-        ├── theme.rs       # Thèmes et styles
-        └── components/    
-            ├── mod.rs     
-            ├── table.rs   
-            ├── sidebar.rs 
-            └── forms/     
-                ├── mod.rs 
-                ├── general.rs
-                ├── auth.rs    
-                └── themes.rs  
+Fichier	Son Rôle	Analogie
+src/ui/mod.rs	Le Cerveau & la Logique	Le Chef : Il reçoit les ordres (Messages) et décide quoi faire (Update).
+src/ui/login.rs	La Structure Globale	La Salle : Il définit où se trouve la Sidebar et où on affiche le contenu.
+views/login/general.rs	Page "Général"	Le Menu du jour : Il contient tout le code du tableau et des inputs d'IP.
+views/login/auth.rs	Page "Sécurité"	La Caisse : Il ne s'occupe que de l'utilisateur et du mot de passe.
+views/login/themes.rs	Page "Thèmes"	La Décoration : Il ne s'occupe que de la grille de couleurs.
 ```
 
