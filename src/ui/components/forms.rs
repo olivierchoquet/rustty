@@ -23,12 +23,16 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 "Nom du profil",
                 &app.current_profile.name,
                 colors,
+                None,
+                false,
                 Message::InputNewProfileName,
             ),
             render_input_with_label(
                 "Groupe",
                 &app.current_profile.group,
                 colors,
+                None,
+                false,
                 Message::InputNewProfileGroup,
             ),
         ]
@@ -38,12 +42,16 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 "Adresse IP",
                 &app.current_profile.ip,
                 colors,
+                None,
+                false,   
                 Message::InputIP,
             ),
             render_input_with_label(
                 "Port",
                 &app.current_profile.port,
                 colors,
+                None,
+                false,
                 Message::InputPort,
             ),
         ]
@@ -53,12 +61,16 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 "Nom d'utilisateur",
                 &app.current_profile.username,
                 colors,
+                None,
+                false,   
                 Message::InputUsername,
             ),
             render_input_with_label(
                 "Mot de passe",
                 &app.password,
                 colors,
+                Some("⚠️ Non enregistré dans le profil pour votre sécurité"),
+                true,
                 Message::InputPass,
             ),
         ]
@@ -68,32 +80,37 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
     .into()
 }
 
-// On passe 'colors' en argument pour que les labels utilisent tes couleurs de thème
 fn render_input_with_label<'a>(
     label: &'a str, 
-    value: &'a str, 
-    colors: TerminalColors, // Ton struct de couleurs
+    value: &str, 
+    colors: TerminalColors,
+    helper_text: Option<&'a str>,
+    is_secure: bool, // Nouveau : cache le texte si true
     msg: impl Fn(String) -> Message + 'a
 ) -> Element<'a, Message> {
-    column![
-        // Le label (petit et discret)
+    let mut col = column![
+        // 1. Label
         text(label)
             .size(13)
-            .style(move |_theme: &Theme| {
-                text::Style {
-                    // On utilise une couleur grise ou une version atténuée de ton texte
-                    color: Some(colors.text), 
-                }
-            }),
+            .style(|_| text::Style { color: Some(Color::from_rgb(0.5, 0.5, 0.5)) }),
             
-        // Le champ de saisie
+        // 2. Input avec option .secure()
         text_input(label, value)
             .on_input(msg)
             .padding(10)
-            .size(16)
-    ]
-    .spacing(5)
-    .into()
+            .secure(is_secure), // Applique le masquage si is_secure est vrai
+    ].spacing(5);
+
+    // 3. Helper Text
+    if let Some(help) = helper_text {
+        col = col.push(
+            text(help)
+                .size(11)
+                .style(|_| text::Style { color: Some(Color::from_rgb(0.8, 0.4, 0.4)) })
+        );
+    }
+
+    col.into()
 }
 
 // Le formulaire pour l'onglet Auth  - NON UTILISE POUR L'INSTANT - utilisateur et mot de passe dans l'onglet Général
@@ -128,7 +145,7 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
     let mut row_items = row![].spacing(10);
 
     for (i, theme) in ThemeChoice::ALL.iter().enumerate() {
-        let is_selected = app.theme_choice == *theme;
+        let is_selected = app.current_profile.theme == *theme;
         let theme_colors = theme.get_colors();
 
         let theme_button = button(
@@ -202,6 +219,9 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
                 ..iced::Font::DEFAULT
             }),
         text("Choisissez un thème visuel pour votre terminal et l'application.")
+            .size(14)
+            .color(colors.text),
+        text("Vous pouvez choisir un thème différent pour chaque profil.")
             .size(14)
             .color(colors.text),
         scrollable(themes_list).height(Length::Fill),

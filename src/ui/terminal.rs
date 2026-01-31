@@ -5,7 +5,7 @@ use iced::widget::{button, column, container, row, scrollable, text, text_input,
 use iced::{Alignment, Element, Length, Task};
 
 pub fn view(app: &MyApp) -> Element<'_, Message> {
-    let colors = app.theme_choice.get_colors();
+    let colors = app.current_profile.theme.get_colors();
 
     // --- 1. BARRE D'ONGLETS & SÉLECTEUR ---
     let tab_bar = container(
@@ -35,7 +35,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
             // LE SÉLECTEUR DE THÈME (PICK LIST)
             pick_list(
                 &ThemeChoice::ALL[..],
-                Some(app.theme_choice),
+                Some(app.current_profile.theme),
                 Message::ThemeSelected 
             )
             .text_size(12)
@@ -129,7 +129,7 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
 pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
     match message {
         Message::ThemeSelected(new_theme) => {
-            app.theme_choice = new_theme;
+            app.current_profile.theme = new_theme;
         }
 
         Message::SshData(data) => {

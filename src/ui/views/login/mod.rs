@@ -21,7 +21,7 @@ pub mod general;
 pub mod themes;
 
 pub fn render(app: &MyApp) -> Element<'_, Message> {
-    let colors = app.theme_choice.get_colors();
+    let colors = app.current_profile.theme.get_colors();
 
     // 1. Appel du composant Sidebar
     let side_menu = sidebar::render(app.active_section, colors);
@@ -214,7 +214,7 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             // Iced 0.13 redessine automatiquement dès que l'état change
         }
         Message::ThemeChanged(new_theme) => {
-            app.theme_choice = new_theme;
+            app.current_profile.theme = new_theme;
             // Optionnel : println!("Thème appliqué : {:?}", new_theme);
 
             // Si tu as une fonction de sauvegarde, c'est le moment

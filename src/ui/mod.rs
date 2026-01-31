@@ -105,7 +105,7 @@ pub struct MyApp {
     pub history: Vec<String>,   // Liste des commandes passées
     pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
-    pub theme_choice: ThemeChoice,
+   // pub theme_choice: ThemeChoice,
     // Gestion des profils
     pub current_profile: Profile, // Le "brouillon" lié aux inputs
     pub selected_profile_id: Option<uuid::Uuid>, // L'ID du profil qu'on est en train d'éditer
@@ -133,7 +133,7 @@ impl MyApp {
             history: Vec::new(),
             history_index: None,
             focus_index: 0,
-            theme_choice: ThemeChoice::Slate,
+            //theme_choice: ThemeChoice::Slate,
             // chargement des profils sauvegardées
             profiles: loaded_profiles,
             selected_profile_id: None,

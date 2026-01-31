@@ -14,3 +14,8 @@ views/login/auth.rs	Page "Sécurité"	La Caisse : Il ne s'occupe que de l'utilis
 views/login/themes.rs	Page "Thèmes"	La Décoration : Il ne s'occupe que de la grille de couleurs.
 ```
 
+Remarques :
+
+Rendu visuel (forms, components, ..)
+
+Iced travaille avec des types Element<'a, Message>. Le 'a indique au compilateur : "Ce widget contient des références à des données qui doivent rester valides tant que le widget est affiché". Sans le 'a sur tes &str, Rust a peur que le texte disparaisse de la mémoire alors que l'interface essaie encore de l'afficher.
