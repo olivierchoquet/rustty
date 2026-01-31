@@ -3,6 +3,7 @@ use iced::futures::SinkExt;
 use iced::widget::text_input;
 use iced::{Element, Task, window};
 use russh::client;
+use uuid::Uuid;
 // Importation des types pour la gestion de la concurrence
 use std::sync::Arc;
 // Importation de Mutex asynchrone de tokio
@@ -11,10 +12,9 @@ use tokio::sync::Mutex;
 use crate::ssh::{MyHandler, SshChannel};
 use crate::ui::theme::ThemeChoice;
 
-
+pub mod components;
 pub mod terminal;
 pub mod theme;
-pub mod components;
 pub mod views;
 
 // Identifiant unique pour le widget scrollable du terminal
@@ -50,9 +50,10 @@ pub enum Message {
     TabPressed,
     WindowOpened(window::Id),
     ThemeSelected(ThemeChoice),
-    ProfileSelected(Profile),
+    ProfileSelected(uuid::Uuid),
     SaveProfile,
     DeleteProfile,
+    NewProfile,
     InputNewProfileName(String),
     InputNewProfileGroup(String),
     SearchChanged(String),
@@ -70,11 +71,12 @@ impl std::fmt::Debug for Message {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub struct Profile {
+    pub id: Uuid,
     pub name: String,
     pub ip: String,
     pub port: String,
     pub username: String,
-    pub group: String, 
+    pub group: String,
     pub theme: ThemeChoice,
 }
 
@@ -84,17 +86,14 @@ impl std::fmt::Display for Profile {
     }
 }
 
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditSection {
     General,
     Auth,
     Network,
     Advanced,
-    Themes
+    Themes,
 }
-
 
 pub struct MyApp {
     pub password: String,
@@ -107,10 +106,10 @@ pub struct MyApp {
     pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
     pub theme_choice: ThemeChoice,
-    // Gestion des profils sauvegardées
-    pub selected_profile: Option<Profile>,
+    // Gestion des profils
+    pub current_profile: Profile, // Le "brouillon" lié aux inputs
+    pub selected_profile_id: Option<uuid::Uuid>, // L'ID du profil qu'on est en train d'éditer
     pub profiles: Vec<Profile>,
-    pub current_profile: Profile, // Contient name, group, ip, port, username
     //pub password: String,         // On le garde à part (sécurité)
     pub search_query: String, // Pour le filtrage global
     // Catégorie de parammètres en cours d'édition
@@ -119,6 +118,11 @@ pub struct MyApp {
 
 impl MyApp {
     pub fn new(login_id: window::Id) -> Self {
+        let loaded_profiles = Self::load_profiles(); // <-- On charge ici
+        println!(
+            "DEBUG: {} profils chargés au démarrage",
+            loaded_profiles.len()
+        );
         Self {
             password: "".into(),
             logs: String::from("Prêt...\n"),
@@ -129,24 +133,19 @@ impl MyApp {
             history: Vec::new(),
             history_index: None,
             focus_index: 0,
-            theme_choice: ThemeChoice::Slate, 
+            theme_choice: ThemeChoice::Slate,
             // chargement des profils sauvegardées
-            profiles: MyApp::load_profiles(),
-            selected_profile: None,
-            current_profile: Profile {
-                name: "".into(),
-                ip: "".into(),
-                port: "".into(),
-                username: "".into(),
-                group: "".into(),
-                theme: ThemeChoice::Slate,
-            },
+            profiles: loaded_profiles,
+            selected_profile_id: None,
+            // profil "brouillon" vide au départ
+            current_profile: Profile::default(),
             search_query: "".into(),
             active_section: EditSection::General,
         }
     }
 
     fn perform_ssh_connection(&self) -> Task<Message> {
+        //println!("Tentative de connexion à {}...", self.current_profile.ip);
         let Profile = self.current_profile.ip.clone();
         let user = self.current_profile.username.clone();
         let pass = self.password.clone();
@@ -158,16 +157,19 @@ impl MyApp {
                 sender: output.clone(),
             };
 
-            if let Ok(mut handle) = client::connect(config, (Profile.as_str(), port), handler).await {
+            if let Ok(mut handle) = client::connect(config, (Profile.as_str(), port), handler).await
+            {
                 if handle
                     .authenticate_password(user, pass)
                     .await
                     .unwrap_or(false)
                 {
+                    println!("Authentification réussie !");
                     let _ = output
                         .send(Message::SshConnected(Ok(Arc::new(Mutex::new(handle)))))
                         .await;
                 } else {
+                    println!("Échec de l'authentification.");
                     let _ = output
                         .send(Message::SshConnected(
                             Err("Échec d'authentification".into()),
@@ -183,6 +185,7 @@ impl MyApp {
     }
 
     fn open_terminal(&self, handle: Arc<Mutex<client::Handle<MyHandler>>>) -> Task<Message> {
+        println!("Ouverture de la fenêtre terminal...");
         let (id, win_task) = window::open(window::Settings {
             size: iced::Size::new(950.0, 650.0),
             ..Default::default()
@@ -237,9 +240,7 @@ impl MyApp {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             // Actions de haut niveau (isolées dans des méthodes)
-            Message::ButtonConnection => {
-                self.perform_ssh_connection()
-            }
+            Message::ButtonConnection => self.perform_ssh_connection(),
             Message::SshConnected(Ok(handle)) => self.open_terminal(handle),
             Message::SshConnected(Err(e)) => {
                 self.logs.push_str(&format!("Erreur: {}\n", e));
@@ -253,6 +254,7 @@ impl MyApp {
             | Message::InputPass(_)
             | Message::SaveProfile
             | Message::DeleteProfile
+            | Message::NewProfile
             | Message::InputNewProfileName(_)
             | Message::InputNewProfileGroup(_)
             | Message::SearchChanged(_)
@@ -260,14 +262,17 @@ impl MyApp {
             | Message::SectionChanged(_)
             | Message::ThemeChanged(_)
             | Message::TabPressed => crate::ui::views::login::update(self, message),
+            Message::QuitRequested => {
+                std::process::exit(0);
+            }
 
             Message::SshData(_)
             | Message::HistoryPrev
             | Message::HistoryNext
             | Message::SendCommand
             | Message::SetChannel(_)
-            | Message::InputTerminal(_) 
-            | Message::ThemeSelected(_)=> terminal::update(self, message),
+            | Message::InputTerminal(_)
+            | Message::ThemeSelected(_) => terminal::update(self, message),
 
             // Gestion globale (Fenêtres)
             Message::TerminalWindowOpened(id) => {
@@ -301,19 +306,68 @@ impl MyApp {
 
     // Sauvegarder la liste sur le disque
     pub fn save_profiles(&self) {
-        if let Ok(json) = serde_json::to_string_pretty(&self.profiles) {
-            let _ = std::fs::write("profiles.json", json);
+        // 1. Tentative de sérialisation
+        match serde_json::to_string_pretty(&self.profiles) {
+            Ok(json) => {
+                // 2. Tentative d'écriture atomique (on écrit tout d'un coup)
+                match std::fs::write("profiles.json", json) {
+                    Ok(_) => {
+                        println!("LOG: Sauvegarde réussie ({} profils).", self.profiles.len());
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "ERREUR CRITIQUE: Impossible d'écrire dans profiles.json: {}",
+                            e
+                        );
+                        // Ici, on pourrait ajouter une notification UI pour l'utilisateur
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("ERREUR: Échec de la conversion en JSON: {}", e);
+            }
         }
     }
 
     // Charger la liste au démarrage
     pub fn load_profiles() -> Vec<Profile> {
-        if let Ok(data) = std::fs::read_to_string("profiles.json") {
-            if let Ok(profiles) = serde_json::from_str(&data) {
-                return profiles;
+        let path = "profiles.json";
+
+        // 1. On vérifie d'abord si le fichier existe pour éviter de traiter une erreur inutile
+        if !std::path::Path::new(path).exists() {
+            println!("INFO : Aucun fichier profiles.json trouvé. Démarrage à vide.");
+            return Vec::new();
+        }
+
+        // 2. Tentative de lecture du fichier
+        match std::fs::read_to_string(path) {
+            Ok(data) => {
+                // 3. Tentative de parsing JSON
+                match serde_json::from_str::<Vec<Profile>>(&data) {
+                    Ok(profiles) => {
+                        println!("LOG : {} profil(s) chargé(s) avec succès.", profiles.len());
+                        profiles
+                    }
+                    Err(e) => {
+                        // C'est ici que l'erreur s'affichera si tes anciens profils n'ont pas d'ID
+                        println!(
+                            "ERREUR : Le fichier profiles.json est corrompu ou mal formé : {}",
+                            e
+                        );
+                        println!(
+                            "CONSEIL : Supprimez profiles.json pour qu'il soit recréé proprement."
+                        );
+                        Vec::new()
+                    }
+                }
+            }
+            Err(e) => {
+                println!(
+                    "ERREUR : Impossible de lire le fichier profiles.json : {}",
+                    e
+                );
+                Vec::new()
             }
         }
-        Vec::new() // Retourne une liste vide si le fichier n'existe pas
     }
-
 }

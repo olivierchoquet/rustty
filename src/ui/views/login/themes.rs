@@ -9,7 +9,7 @@ pub fn render<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message
         
         // Pas forcément besoin de "Démarrer SSH" ici, 
         // mais on garde "Sauvegarder" via actions pour la cohérence
-        actions::buttons_form(colors),
+        actions::buttons_form(colors, app.selected_profile_id.is_some()),
     ]
     .spacing(20)
     .into()

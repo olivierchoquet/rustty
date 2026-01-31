@@ -1,40 +1,111 @@
-use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Alignment, Color, Element, Font, Length};
-use iced::font::Weight;
 use crate::ui::theme::{self, ThemeChoice};
 use crate::ui::{Message, MyApp, theme::TerminalColors};
+use iced::font::Weight;
+use iced::widget::{button, column, container, row, scrollable, text, text_input};
+use iced::{Alignment, Color, Element, Font, Length, Theme};
 
 // Le formulaire pour l'onglet Général
 pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     column![
-        text("ÉDITION DU PROFIL").size(14).font(Font { weight: Weight::Bold, ..Font::default() }).color(colors.accent),
+        text("ÉDITION DU PROFIL")
+            .size(14)
+            .font(Font {
+                weight: Weight::Bold,
+                ..Font::default()
+            })
+            .color(colors.accent),
         row![
-            text_input("Nom du profil", &app.current_profile.name)
+            /*text_input("Nom du profil", &app.current_profile.name)
                 .on_input(Message::InputNewProfileName)
                 .padding(10)
-                .style(move |t, s| crate::ui::theme::input_style(colors, s)),
-            text_input("Groupe", &app.current_profile.group)
-                .on_input(Message::InputNewProfileGroup)
-                .padding(10)
-                .style(move |t, s| crate::ui::theme::input_style(colors, s)),
-        ].spacing(10),
+                .style(move |t, s| crate::ui::theme::input_style(colors, s)),*/
+            render_input_with_label(
+                "Nom du profil",
+                &app.current_profile.name,
+                colors,
+                Message::InputNewProfileName,
+            ),
+            render_input_with_label(
+                "Groupe",
+                &app.current_profile.group,
+                colors,
+                Message::InputNewProfileGroup,
+            ),
+        ]
+        .spacing(10),
         row![
-            text_input("Adresse IP", &app.current_profile.ip)
-                .on_input(Message::InputIP)
-                .padding(10)
-                .style(move |t, s| crate::ui::theme::input_style(colors, s)),
-            text_input("Port", &app.current_profile.port)
-                .on_input(Message::InputPort)
-                .padding(10)
-                .style(move |t, s| crate::ui::theme::input_style(colors, s)),
-        ].spacing(10),
-    ].spacing(15).into()
+            render_input_with_label(
+                "Adresse IP",
+                &app.current_profile.ip,
+                colors,
+                Message::InputIP,
+            ),
+            render_input_with_label(
+                "Port",
+                &app.current_profile.port,
+                colors,
+                Message::InputPort,
+            ),
+        ]
+        .spacing(10),
+        row![
+           render_input_with_label(
+                "Nom d'utilisateur",
+                &app.current_profile.username,
+                colors,
+                Message::InputUsername,
+            ),
+            render_input_with_label(
+                "Mot de passe",
+                &app.password,
+                colors,
+                Message::InputPass,
+            ),
+        ]
+        .spacing(10),
+    ]
+    .spacing(15)
+    .into()
 }
 
-// Le formulaire pour l'onglet Auth
-pub fn auth_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
+// On passe 'colors' en argument pour que les labels utilisent tes couleurs de thème
+fn render_input_with_label<'a>(
+    label: &'a str, 
+    value: &'a str, 
+    colors: TerminalColors, // Ton struct de couleurs
+    msg: impl Fn(String) -> Message + 'a
+) -> Element<'a, Message> {
     column![
-        text("SÉCURITÉ ET ACCÈS").size(14).font(Font { weight: Weight::Bold, ..Font::default() }).color(colors.accent),
+        // Le label (petit et discret)
+        text(label)
+            .size(13)
+            .style(move |_theme: &Theme| {
+                text::Style {
+                    // On utilise une couleur grise ou une version atténuée de ton texte
+                    color: Some(colors.text), 
+                }
+            }),
+            
+        // Le champ de saisie
+        text_input(label, value)
+            .on_input(msg)
+            .padding(10)
+            .size(16)
+    ]
+    .spacing(5)
+    .into()
+}
+
+// Le formulaire pour l'onglet Auth  - NON UTILISE POUR L'INSTANT - utilisateur et mot de passe dans l'onglet Général
+/* pub fn auth_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
+    column![
+        text("SÉCURITÉ ET ACCÈS")
+            .size(14)
+            .font(Font {
+                weight: Weight::Bold,
+                ..Font::default()
+            })
+            .color(colors.accent),
         text_input("Nom d'utilisateur", &app.current_profile.username)
             .on_input(Message::InputUsername)
             .padding(10)
@@ -44,9 +115,11 @@ pub fn auth_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Mess
             .secure(true)
             .padding(10)
             .style(move |t, s| crate::ui::theme::input_style(colors, s)),
-    ].spacing(15).into()
+    ]
+    .spacing(15)
+    .into()
 }
-
+*/
 
 pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Message> {
     let mut themes_list = column![].spacing(10);

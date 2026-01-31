@@ -1,10 +1,23 @@
-use iced::{Element, Task, widget::{text_input, column, row, text, container, vertical_space, horizontal_rule}, Font, Color, Length, font::Weight};
+use iced::{
+    Alignment, Color, Element, Font, Length, Task,
+    font::Weight,
+    widget::{column, container, horizontal_rule, row, text, text_input, vertical_space},
+};
 
-use crate::ui::{EditSection, ID_PASS, ID_PORT, ID_USER, Message, MyApp, Profile, components::{actions, forms::{auth_form, general_form, theme_form}, sidebar, table::{content, header}}, theme};
+use crate::ui::{
+    EditSection, ID_PASS, ID_PORT, ID_USER, Message, MyApp, Profile,
+    components::{
+        actions,
+        forms::{general_form, theme_form},
+        sidebar,
+        table::{content, header},
+    },
+    theme,
+};
 
 // On dit juste à Rust que les fichiers à côté existent
-pub mod general;
 pub mod auth;
+pub mod general;
 pub mod themes;
 
 pub fn render(app: &MyApp) -> Element<'_, Message> {
@@ -12,7 +25,6 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
 
     // 1. Appel du composant Sidebar
     let side_menu = sidebar::render(app.active_section, colors);
-   
 
     // 2. LOGO "RustTy"
     let brand_header = column![
@@ -51,19 +63,18 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
                 column![header(colors), content(app, colors),],
                 horizontal_rule(1),
                 general_form(app, colors),
-                actions::buttons_form(colors),
+                //actions::buttons_form(colors),
             ]
             .spacing(20)
             .into()
         }
 
-        EditSection::Auth => column![
+        /*EditSection::Auth => column![
             auth_form(app, colors),
             vertical_space().height(Length::Fill),
         ]
         .spacing(20)
-        .into(),
-
+        .into(),*/
         EditSection::Themes => column![theme_form(app, colors),].spacing(20).into(),
 
         _ => column![text("Section en cours de développement...").color(colors.text),]
@@ -71,17 +82,25 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
             .into(),
     };
 
-    // --- 4. ASSEMBLAGE FINAL ---
-    row![
-        side_menu,
-        container(column![brand_header, vertical_space().height(10), dynamic_content,].spacing(20))
+    // 4. Barre d'actions commune à tous les onglets (Sauvegarder, Supprimer, Démarrer, Quitter)
+    let actions_bar = actions::buttons_form(colors, app.selected_profile_id.is_some());
+    // 5. ASSEMBLAGE FINAL ---
+    column![
+        row![
+            side_menu,
+            container(
+                column![brand_header, vertical_space().height(10), dynamic_content].spacing(20)
+            )
             .padding(25)
             .width(Length::Fill)
             .height(Length::Fill)
             .style(move |_| theme::main_container_style(colors)),
+        ]
+        .width(Length::Fill)
+        .height(Length::Fill),
+        actions_bar,
     ]
-    .width(Length::Fill)
-    .height(Length::Fill)
+    .align_x(iced::alignment::Horizontal::Center)
     .into()
 }
 
@@ -103,14 +122,21 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             };
             return text_input::focus(text_input::Id::new(target_id));
         }
-        Message::ProfileSelected(profile) => {
-            app.current_profile.group = profile.group.clone();
-            app.current_profile.name = profile.name.clone();
-            app.current_profile.ip = profile.ip.clone();
-            app.current_profile.port = profile.port.clone();
-            app.current_profile.username = profile.username.clone();
-            app.current_profile.theme = profile.theme;
-            app.selected_profile = Some(profile);
+        Message::ProfileSelected(id) => {
+            // 1. On cherche le profil dans notre liste grâce à l'ID
+            if let Some(profile_trouve) = app.profiles.iter().find(|p| p.id == id) {
+                // 2. On marque cet ID comme étant celui sélectionné (pour le surlignage du tableau)
+                app.selected_profile_id = Some(id);
+
+                // 3. On remplit le formulaire avec une copie des données
+                // .clone() est nécessaire ici car current_profile possède ses propres données
+                app.current_profile = profile_trouve.clone();
+
+                println!(
+                    "DEBUG: Profil '{}' chargé dans le formulaire",
+                    profile_trouve.name
+                );
+            }
         }
         Message::InputNewProfileName(name) => {
             app.current_profile.name = name;
@@ -122,32 +148,60 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             app.search_query = query;
         }
         Message::SaveProfile => {
+            // 1. On vérifie les champs obligatoires
             if !app.current_profile.ip.is_empty() && !app.current_profile.name.is_empty() {
-                let group = if app.current_profile.group.is_empty() {
-                    "DEFAUT".to_string()
+                // On gère le groupe par défaut
+                if app.current_profile.group.is_empty() {
+                    app.current_profile.group = "DEFAUT".to_string();
                 } else {
-                    app.current_profile.group.to_uppercase()
-                };
+                    app.current_profile.group = app.current_profile.group.to_uppercase();
+                }
 
-                let new_profile = Profile {
-                    name: app.current_profile.name.clone(),
-                    ip: app.current_profile.ip.clone(),
-                    port: app.current_profile.port.clone(),
-                    username: app.current_profile.username.clone(),
-                    group,
-                    theme: app.theme_choice,
-                };
-                app.profiles.push(new_profile);
-                // On trie par groupe puis par nom pour avoir une liste propre
+                match app.selected_profile_id {
+                    // --- CAS UPDATE : Un profil est sélectionné ---
+                    Some(id_recherche) => {
+                        if let Some(index) = app.profiles.iter().position(|p| p.id == id_recherche)
+                        {
+                            // On remplace l'ancien profil par les nouvelles données du formulaire
+                            // Tout en s'assurant que l'ID reste celui d'origine
+                            let mut updated_profile = app.current_profile.clone();
+                            updated_profile.id = id_recherche;
+
+                            app.profiles[index] = updated_profile;
+                            println!("DEBUG: Profil mis à jour à l'index {}", index);
+                        }
+                    }
+                    // --- CAS INSERT : Aucun profil sélectionné ---
+                    None => {
+                        let mut new_profile = app.current_profile.clone();
+                        new_profile.id = uuid::Uuid::new_v4(); // On génère un ID unique pour le nouveau
+                        let new_profile_id = new_profile.id;
+
+                        app.profiles.push(new_profile);
+                        app.selected_profile_id = Some(new_profile_id); // On sélectionne le nouveau venu !
+                        println!("DEBUG: Nouveau profil inséré dans la liste");
+                    }
+                }
+
+                // 2. Post-traitement : Tri, Sauvegarde disque et Reset
                 app.profiles
                     .sort_by(|a, b| a.group.cmp(&b.group).then(a.name.cmp(&b.name)));
-                app.save_profiles(); // On écrit sur le disque après l'ajout
+
+                app.save_profiles();
+  
             }
         }
+
+        Message::NewProfile => {
+            app.selected_profile_id = None; // On sort du mode édition
+            app.current_profile = Profile::default(); // On vide les champs (formulaire vierge)
+            println!("DEBUG: Formulaire réinitialisé pour un nouveau profil");
+        }
+
         Message::DeleteProfile => {
-            if let Some(selected) = &app.selected_profile {
-                app.profiles.retain(|p| p != selected);
-                app.selected_profile = None;
+            if let Some(selected_profile_id) = &app.selected_profile_id {
+                app.profiles.retain(|p| p.id != *selected_profile_id);
+                app.selected_profile_id = None;
                 // Optionnel : vider les champs après suppression
                 app.current_profile.ip.clear();
                 app.current_profile.username.clear();

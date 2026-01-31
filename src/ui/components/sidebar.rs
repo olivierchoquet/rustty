@@ -15,19 +15,15 @@ pub fn render<'a>(active_section: EditSection, colors: TerminalColors) -> Elemen
             vertical_space().height(10),
             
             nav_button("Général", EditSection::General, active_section, colors),
-            nav_button("Sécurité", EditSection::Auth, active_section, colors),
-            nav_button("Réseau", EditSection::Network, active_section, colors),
+            //nav_button("Sécurité", EditSection::Auth, active_section, colors),
+            //nav_button("Réseau", EditSection::Network, active_section, colors),
             
             vertical_space().height(Length::Fill),
             
-            nav_button("Avancé", EditSection::Advanced, active_section, colors),
+            //nav_button("Avancé", EditSection::Advanced, active_section, colors),
             nav_button("Thèmes", EditSection::Themes, active_section, colors),
             
-            button(text("Quitter").center())
-                .width(Length::Fill)
-                .padding(10)
-                .on_press(Message::QuitRequested)
-                .style(move |t, s| theme::button_style(colors, s)),
+           
         ]
         .spacing(10)
         .padding(15)

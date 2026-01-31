@@ -15,7 +15,7 @@ pub fn render<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message
 
         // Partie basse : Édition du profil sélectionné
         forms::general_form(app, colors),
-        actions::buttons_form(colors),
+        actions::buttons_form(colors, app.selected_profile_id.is_some()),
     ]
     .spacing(20)
     .into()

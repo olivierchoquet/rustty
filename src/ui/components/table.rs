@@ -1,7 +1,7 @@
-use iced::widget::{button, column, container, row, scrollable, text};
-use iced::{Element, Length};
 use crate::ui::theme;
 use crate::ui::{Message, MyApp, theme::TerminalColors};
+use iced::widget::{button, column, container, row, scrollable, text};
+use iced::{Element, Length};
 
 pub fn header<'a>(colors: TerminalColors) -> container::Container<'a, Message> {
     container(
@@ -46,7 +46,7 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
 
     for (i, profile) in app.profiles.iter().enumerate() {
         if query.is_empty() || profile.name.to_lowercase().contains(&query) {
-            let is_selected = app.selected_profile.as_ref() == Some(profile);
+            let is_selected = app.selected_profile_id == Some(profile.id);
             let zebra_color = if i % 2 == 0 {
                 colors.surface
             } else {
@@ -69,15 +69,20 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
                     .padding(8),
                 )
                 .width(Length::Fill)
-                .on_press(Message::ProfileSelected(profile.clone()))
+                .on_press(Message::ProfileSelected(profile.id))
                 .style(move |_, status| {
                     let mut st = theme::button_style(colors, status);
                     if is_selected {
                         st.background = Some(colors.prompt.into());
                         st.text_color = colors.accent;
+                        // AJOUT : Une bordure pour bien marquer le coup
+                        st.border.width = 2.0;
+                        st.border.color = colors.accent;
                     } else {
+                        // MAJ : Couleur zébrée pour les lignes non sélectionnées
                         st.background = Some(zebra_color.into());
                         st.text_color = colors.text;
+                        st.border.width = 0.0;
                     }
                     st
                 }),
@@ -86,5 +91,5 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
     }
 
     // Maintenant .into() fonctionnera car les durées de vie sont liées
-    scrollable(content).height(Length::Fixed(300.0)).into()
+    scrollable(content).height(Length::Fixed(150.0)).into()
 }

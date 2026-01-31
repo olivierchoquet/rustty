@@ -12,4 +12,7 @@ async-trait = "0.1"
 rpassword = "7.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-directories = "5.0" # Pour trouver le dossier "AppData" ou ".config" proprement
+# On utilise la v4 pour générer des IDs aléatoires et la feature serde pour le JSON
+uuid = { version = "1.10", features = ["v4", "serde"] }
+# Aide à trouver le dossier "AppData" ou ".config" proprement
+directories = "5.0"
