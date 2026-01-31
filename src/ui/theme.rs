@@ -184,6 +184,19 @@ pub struct TerminalColors {
     pub surface: Color,
 }
 
+// Default == Slate Theme
+impl Default for TerminalColors {
+    fn default() -> Self {
+        Self {
+            bg: Color::from_rgb(0.11, 0.13, 0.17),
+            text: Color::from_rgb(0.85, 0.87, 0.91),
+            prompt: Color::from_rgb(0.5, 0.88, 0.75),
+            accent: Color::from_rgb(0.4, 0.7, 1.0),
+            surface: Color::from_rgb(0.15, 0.17, 0.22),
+        }
+    }
+}
+
 // --- FONCTIONS DE STYLE ---
 
 pub fn input_style(colors: TerminalColors, status: text_input::Status) -> text_input::Style {
@@ -220,7 +233,10 @@ pub fn button_style(colors: TerminalColors, status: button::Status) -> button::S
     // On définit une opacité différente au survol
     let bg_color = match status {
         button::Status::Hovered => colors.accent,
-        _ => Color { a: 0.9, ..colors.accent },
+        _ => Color {
+            a: 0.9,
+            ..colors.accent
+        },
     };
 
     button::Style {
@@ -234,10 +250,11 @@ pub fn button_style(colors: TerminalColors, status: button::Status) -> button::S
     }
 }
 
-
-
 // Style "Accent" pour les actions principales (Démarrer SSH)
-pub fn active_button_style(colors: TerminalColors, status: iced::widget::button::Status) -> iced::widget::button::Style {
+pub fn active_button_style(
+    colors: TerminalColors,
+    status: iced::widget::button::Status,
+) -> iced::widget::button::Style {
     let base = iced::widget::button::Style {
         background: Some(iced::Background::Color(colors.accent)),
         text_color: colors.bg, // Texte sombre sur fond brillant

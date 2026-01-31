@@ -1,7 +1,7 @@
 // iced::futures::SinkExt est nécessaire pour l'envoi asynchrone de messages
 use iced::futures::SinkExt;
-use iced::widget::text_input;
-use iced::{Element, Task, window};
+use iced::widget::{Text, text_input};
+use iced::{Color, Element, Task, window};
 use russh::client;
 use uuid::Uuid;
 // Importation des types pour la gestion de la concurrence
@@ -9,8 +9,8 @@ use std::sync::Arc;
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
 // Mes modules internes
-use crate::ssh::{MyHandler, SshChannel};
-use crate::ui::theme::ThemeChoice;
+use crate::ssh::{MyHandler, SshChannel, TextSegment};
+use crate::ui::theme::{TerminalColors, ThemeChoice};
 
 pub mod components;
 pub mod terminal;
@@ -40,7 +40,7 @@ pub enum Message {
     SshConnected(Result<Arc<Mutex<russh::client::Handle<MyHandler>>>, String>),
     TerminalWindowOpened(window::Id),
     SetChannel(Arc<Mutex<SshChannel>>),
-    SshData(String),
+    SshData(Vec<TextSegment>),
     InputTerminal(String),
     SendCommand,
     DoNothing,
@@ -97,7 +97,9 @@ pub enum EditSection {
 
 pub struct MyApp {
     pub password: String,
-    pub logs: String, // Contient tout le texte affiché dans le terminal
+    //pub logs: Vec<TextSegment>, // Contient tout le texte affiché dans le terminal
+    // Une liste de lignes. Chaque ligne contient ses segments colorés.
+    pub terminal_lines: Vec<Vec<TextSegment>>,
     pub login_window_id: Option<window::Id>,
     pub terminal_window_id: Option<window::Id>,
     pub active_channel: Option<Arc<Mutex<SshChannel>>>, // La session SSH active
@@ -105,7 +107,7 @@ pub struct MyApp {
     pub history: Vec<String>,   // Liste des commandes passées
     pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
-   // pub theme_choice: ThemeChoice,
+    // pub theme_choice: ThemeChoice,
     // Gestion des profils
     pub current_profile: Profile, // Le "brouillon" lié aux inputs
     pub selected_profile_id: Option<uuid::Uuid>, // L'ID du profil qu'on est en train d'éditer
@@ -125,7 +127,8 @@ impl MyApp {
         );
         Self {
             password: "".into(),
-            logs: String::from("Prêt...\n"),
+            //logs: String::from("Prêt...\n"),
+            terminal_lines: Vec::new(),
             login_window_id: Some(login_id),
             terminal_window_id: None,
             active_channel: None,
@@ -155,6 +158,9 @@ impl MyApp {
             let config = Arc::new(client::Config::default());
             let handler = MyHandler {
                 sender: output.clone(),
+                current_color: iced::Color::WHITE,
+                is_bold: false,
+                colors_config: TerminalColors::default(),
             };
 
             if let Ok(mut handle) = client::connect(config, (Profile.as_str(), port), handler).await
@@ -243,7 +249,15 @@ impl MyApp {
             Message::ButtonConnection => self.perform_ssh_connection(),
             Message::SshConnected(Ok(handle)) => self.open_terminal(handle),
             Message::SshConnected(Err(e)) => {
-                self.logs.push_str(&format!("Erreur: {}\n", e));
+                //self.terminal_lines.push(vec![TextSegment::new(format!("Erreur: {}\n", e))]);
+                //Task::none()
+                // On crée une ligne contenant un seul segment rouge
+                let error_line = vec![TextSegment::new(
+                    format!("Erreur: {}", e),
+                    Color::from_rgb(0.9, 0.3, 0.3), // Un beau rouge pour l'alerte
+                )];
+
+                self.terminal_lines.push(error_line);
                 Task::none()
             }
 

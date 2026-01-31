@@ -1,7 +1,8 @@
+use crate::ssh::TextSegment;
 use crate::ui::theme::{self, ThemeChoice};
 use crate::ui::{MAX_TERMINAL_LINES, Message, MyApp, SCROLLABLE_ID};
 
-use iced::widget::{button, column, container, row, scrollable, text, text_input, pick_list};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length, Task};
 
 pub fn view(app: &MyApp) -> Element<'_, Message> {
@@ -17,7 +18,12 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
                     .font(iced::Font::MONOSPACE)
                     .color(colors.text)
             )
-            .padding(iced::Padding { top: 6.0, right: 18.0, bottom: 6.0, left: 18.0 })
+            .padding(iced::Padding {
+                top: 6.0,
+                right: 18.0,
+                bottom: 6.0,
+                left: 18.0
+            })
             .style(move |_| container::Style {
                 background: Some(colors.bg.into()),
                 border: iced::Border {
@@ -31,21 +37,24 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
                 },
                 ..Default::default()
             }),
-
             // LE SÉLECTEUR DE THÈME (PICK LIST)
             pick_list(
                 &ThemeChoice::ALL[..],
                 Some(app.current_profile.theme),
-                Message::ThemeSelected 
+                Message::ThemeSelected
             )
             .text_size(12)
             .padding(5),
-
             button(text("+").size(16)).style(button::text).padding(10),
         ]
         .spacing(15)
         .align_y(Alignment::Center)
-        .padding(iced::Padding { top: 8.0, right: 12.0, bottom: 0.0, left: 12.0 }),
+        .padding(iced::Padding {
+            top: 8.0,
+            right: 12.0,
+            bottom: 0.0,
+            left: 12.0,
+        }),
     )
     .width(Length::Fill)
     .style(move |_| container::Style {
@@ -54,41 +63,66 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
     });
 
     // --- 2. ZONE DE LOGS (LE TERMINAL) ---
+   // --- 2. ZONE DE LOGS (LE TERMINAL) ---
     let terminal_logs = scrollable(
         container(
-            text(&app.logs)
-                .font(iced::Font::MONOSPACE)
-                .size(15)
-                .line_height(iced::widget::text::LineHeight::Relative(1.5))
-                .color(colors.text),
+            column(
+                app.terminal_lines.iter().map(|line| {
+                    row(
+                        line.iter().map(|segment| {
+                            text(&segment.content)
+                                .font(iced::Font::MONOSPACE)
+                                .size(15)
+                                .style(move |_| text::Style {
+                                    color: Some(segment.color),
+                                })
+                                .into()
+                        }).collect::<Vec<_>>()
+                    )
+                    .spacing(0)
+                    .into()
+                }).collect::<Vec<_>>()
+            )
+            .spacing(2)
         )
         .padding(25.0)
         .width(Length::Fill),
     )
     .id(scrollable::Id::new(SCROLLABLE_ID))
     .height(Length::Fill)
-    .style(move |_theme, _status| scrollable::Style {
-        container: container::Style {
-            background: Some(colors.bg.into()),
-            ..Default::default()
-        },
-        vertical_rail: scrollable::Rail {
-            background: None,
-            border: iced::Border::default(),
-            scroller: scrollable::Scroller {
-                color: colors.accent,
-                border: iced::Border { radius: 2.0.into(), width: 0.0, color: iced::Color::TRANSPARENT },
+    .style(move |_theme, _status| {
+        // On définit ici l'apparence complète du scrollable
+        scrollable::Style {
+            container: container::Style {
+                background: Some(colors.bg.into()),
+                ..Default::default()
             },
-        },
-        horizontal_rail: scrollable::Rail {
-            background: None,
-            border: iced::Border::default(),
-            scroller: scrollable::Scroller {
-                color: colors.accent,
-                border: iced::Border { radius: 2.0.into(), width: 0.0, color: iced::Color::TRANSPARENT },
+            vertical_rail: scrollable::Rail {
+                background: None,
+                border: iced::Border::default(),
+                scroller: scrollable::Scroller {
+                    color: colors.accent,
+                    border: iced::Border {
+                        radius: 2.0.into(),
+                        width: 0.0,
+                        color: iced::Color::TRANSPARENT,
+                    },
+                },
             },
-        },
-        gap: None,
+            horizontal_rail: scrollable::Rail {
+                background: None,
+                border: iced::Border::default(),
+                scroller: scrollable::Scroller {
+                    color: colors.accent,
+                    border: iced::Border {
+                        radius: 2.0.into(),
+                        width: 0.0,
+                        color: iced::Color::TRANSPARENT,
+                    },
+                },
+            },
+            gap: None,
+        }
     });
 
     // --- 3. LIGNE DE COMMANDE (PROMPT) ---
@@ -100,7 +134,12 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
                     .color(colors.bg)
                     .font(iced::Font::MONOSPACE)
             )
-            .padding(iced::Padding { top: 3.0, right: 12.0, bottom: 3.0, left: 12.0 })
+            .padding(iced::Padding {
+                top: 3.0,
+                right: 12.0,
+                bottom: 3.0,
+                left: 12.0
+            })
             .style(move |_| container::Style {
                 background: Some(colors.prompt.into()),
                 border: iced::Border {
@@ -109,7 +148,10 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
                 },
                 ..Default::default()
             }),
-            text(" ❯ ").color(colors.prompt).size(16).font(iced::Font::MONOSPACE),
+            text(" ❯ ")
+                .color(colors.prompt)
+                .size(16)
+                .font(iced::Font::MONOSPACE),
             text_input("Tapez une commande...", &app.terminal_input)
                 .on_input(Message::InputTerminal)
                 .on_submit(Message::SendCommand)
@@ -118,7 +160,12 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
                 .style(move |_theme, status| theme::input_style(colors, status))
         ]
         .spacing(12)
-        .padding(iced::Padding { top: 12.0, right: 20.0, bottom: 12.0, left: 20.0 })
+        .padding(iced::Padding {
+            top: 12.0,
+            right: 20.0,
+            bottom: 12.0,
+            left: 20.0,
+        })
         .align_y(Alignment::Center),
     )
     .style(move |_| theme::main_container_style(colors));
@@ -132,18 +179,57 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             app.current_profile.theme = new_theme;
         }
 
-        Message::SshData(data) => {
-            app.logs.push_str(&data);
-            let lines: Vec<&str> = app.logs.lines().collect();
-            if lines.len() > MAX_TERMINAL_LINES {
-                app.logs = lines[lines.len() - MAX_TERMINAL_LINES..].join("\n");
-                app.logs.push('\n');
+        Message::SshData(new_segments) => {
+            for segment in new_segments {
+                // 1. Si on a des retours à la ligne dans le segment
+                if segment.content.contains('\n') {
+                    let parts: Vec<&str> = segment.content.split('\n').collect();
+
+                    for (i, part) in parts.iter().enumerate() {
+                        // On ajoute le texte au segment actuel
+                        if !part.is_empty() || i == 0 {
+                            let last_line = app.terminal_lines.last_mut();
+                            if let Some(line) = last_line {
+                                line.push(TextSegment {
+                                    content: part.to_string(),
+                                    color: segment.color,
+                                    is_bold: segment.is_bold,
+                                });
+                            } else {
+                                app.terminal_lines.push(vec![TextSegment {
+                                    content: part.to_string(),
+                                    color: segment.color,
+                                    is_bold: segment.is_bold,
+                                }]);
+                            }
+                        }
+
+                        // Si ce n'est pas le dernier morceau, on crée une nouvelle ligne
+                        if i < parts.len() - 1 {
+                            app.terminal_lines.push(Vec::new());
+                        }
+                    }
+                } else {
+                    // 2. Pas de retour à la ligne, on ajoute juste à la fin
+                    if let Some(line) = app.terminal_lines.last_mut() {
+                        line.push(segment);
+                    } else {
+                        app.terminal_lines.push(vec![segment]);
+                    }
+                }
             }
-            return scrollable::snap_to::<scrollable::Id>(
-                scrollable::Id::new(SCROLLABLE_ID),
-                scrollable::RelativeOffset::END,
-            )
-            .map(|_| Message::DoNothing);
+
+            // --- TON NETTOYAGE ---
+            // Limiter le nombre de lignes (beaucoup plus simple maintenant !)
+            if app.terminal_lines.len() > MAX_TERMINAL_LINES {
+                let to_remove = app.terminal_lines.len() - MAX_TERMINAL_LINES;
+                app.terminal_lines.drain(0..to_remove);
+            }
+
+            // --- AJOUT ICI : Le Snap to Bottom ---
+            // On envoie la commande de scroll tout en bas
+            //scrollable::snap_to_bottom(scrollable::Id::new(SCROLLABLE_ID))
+            //scrollable::snap_to_bottom(scrollable::Id::new(SCROLLABLE_ID))
         }
 
         Message::SendCommand => {
@@ -173,7 +259,7 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
 
         Message::SetChannel(ch) => {
             app.active_channel = Some(ch);
-            app.logs.push_str(">> Session SSH établie\n");
+            //app.logs.push_str(">> Session SSH établie\n");
         }
 
         _ => {}

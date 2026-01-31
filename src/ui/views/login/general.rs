@@ -7,7 +7,7 @@ pub fn render<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message
     column![
         // Partie haute : Le tableau des profils
         column![
-            table::header(colors),
+            table::header(app,colors),
             table::content(app, colors),
         ],
         

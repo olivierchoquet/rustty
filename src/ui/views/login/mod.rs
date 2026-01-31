@@ -55,15 +55,13 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
     let dynamic_content: Element<_> = match app.active_section {
         EditSection::General => {
             column![
-                text_input("🔍 Recherche rapide...", &app.search_query)
-                    .on_input(Message::SearchChanged)
-                    .padding(10)
-                    .style(move |t, s| theme::input_style(colors, s)),
-                // Le tableau n'apparaît que dans l'onglet Général
-                column![header(colors), content(app, colors),],
+                // L'onglet Général appelle le header (qui contient maintenant la recherche)
+                header(app, colors),
+                // Le contenu du tableau (les lignes)
+                content(app, colors),
                 horizontal_rule(1),
+                // Le formulaire
                 general_form(app, colors),
-                //actions::buttons_form(colors),
             ]
             .spacing(20)
             .into()
@@ -188,7 +186,6 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
                     .sort_by(|a, b| a.group.cmp(&b.group).then(a.name.cmp(&b.name)));
 
                 app.save_profiles();
-  
             }
         }
 

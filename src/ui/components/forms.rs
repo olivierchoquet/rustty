@@ -82,31 +82,36 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
 
 fn render_input_with_label<'a>(
     label: &'a str, 
-    value: &str, 
-    colors: TerminalColors,
+    value: &'a str, 
+    colors: TerminalColors, // On va s'en servir !
     helper_text: Option<&'a str>,
-    is_secure: bool, // Nouveau : cache le texte si true
+    is_secure: bool,
     msg: impl Fn(String) -> Message + 'a
 ) -> Element<'a, Message> {
     let mut col = column![
-        // 1. Label
+        // 1. Label utilisant la couleur de texte de ton thème (atténuée)
         text(label)
             .size(13)
-            .style(|_| text::Style { color: Some(Color::from_rgb(0.5, 0.5, 0.5)) }),
+            .style(move |_| text::Style { 
+                // On utilise la couleur d'accent ou de texte de ton struct
+                color: Some(colors.text.into()) 
+            }),
             
-        // 2. Input avec option .secure()
+        // 2. Input
         text_input(label, value)
             .on_input(msg)
             .padding(10)
-            .secure(is_secure), // Applique le masquage si is_secure est vrai
+            .secure(is_secure),
     ].spacing(5);
 
-    // 3. Helper Text
+    // 3. Helper Text utilisant une couleur d'alerte du thème
     if let Some(help) = helper_text {
         col = col.push(
             text(help)
                 .size(11)
-                .style(|_| text::Style { color: Some(Color::from_rgb(0.8, 0.4, 0.4)) })
+                .style(move |_| text::Style { 
+                    color: Some(colors.prompt.into()) // On utilise 'prompt' pour l'alerte
+                })
         );
     }
 
