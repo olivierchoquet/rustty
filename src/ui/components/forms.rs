@@ -16,9 +16,9 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             .color(colors.accent),
         row![
             /*text_input("Nom du profil", &app.current_profile.name)
-                .on_input(Message::InputNewProfileName)
-                .padding(10)
-                .style(move |t, s| crate::ui::theme::input_style(colors, s)),*/
+            .on_input(Message::InputNewProfileName)
+            .padding(10)
+            .style(move |t, s| crate::ui::theme::input_style(colors, s)),*/
             render_input_with_label(
                 "Nom du profil",
                 &app.current_profile.name,
@@ -26,6 +26,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 None,
                 false,
                 Message::InputNewProfileName,
+                None,
             ),
             render_input_with_label(
                 "Groupe",
@@ -34,6 +35,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 None,
                 false,
                 Message::InputNewProfileGroup,
+                None
             ),
         ]
         .spacing(10),
@@ -43,8 +45,9 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 &app.current_profile.ip,
                 colors,
                 None,
-                false,   
+                false,
                 Message::InputIP,
+                None
             ),
             render_input_with_label(
                 "Port",
@@ -53,17 +56,19 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 None,
                 false,
                 Message::InputPort,
+                None
             ),
         ]
         .spacing(10),
         row![
-           render_input_with_label(
+            render_input_with_label(
                 "Nom d'utilisateur",
                 &app.current_profile.username,
                 colors,
                 None,
-                false,   
+                false,
                 Message::InputUsername,
+                None,
             ),
             render_input_with_label(
                 "Mot de passe",
@@ -72,6 +77,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 Some("⚠️ Non enregistré dans le profil pour votre sécurité"),
                 true,
                 Message::InputPass,
+                Some(Message::ButtonConnection)
             ),
         ]
         .spacing(10),
@@ -81,38 +87,34 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
 }
 
 fn render_input_with_label<'a>(
-    label: &'a str, 
-    value: &'a str, 
+    label: &'a str,
+    value: &'a str,
     colors: TerminalColors, // On va s'en servir !
     helper_text: Option<&'a str>,
     is_secure: bool,
-    msg: impl Fn(String) -> Message + 'a
+    msg: impl Fn(String) -> Message + 'a,
+    on_submit_message: Option<Message>,
 ) -> Element<'a, Message> {
     let mut col = column![
         // 1. Label utilisant la couleur de texte de ton thème (atténuée)
-        text(label)
-            .size(13)
-            .style(move |_| text::Style { 
-                // On utilise la couleur d'accent ou de texte de ton struct
-                color: Some(colors.text.into()) 
-            }),
-            
+        text(label).size(13).style(move |_| text::Style {
+            // On utilise la couleur d'accent ou de texte de ton struct
+            color: Some(colors.text.into())
+        }),
         // 2. Input
         text_input(label, value)
             .on_input(msg)
             .padding(10)
-            .secure(is_secure),
-    ].spacing(5);
+            .secure(is_secure)
+            .on_submit(on_submit_message.unwrap_or(Message::DoNothing)),
+    ]
+    .spacing(5);
 
     // 3. Helper Text utilisant une couleur d'alerte du thème
     if let Some(help) = helper_text {
-        col = col.push(
-            text(help)
-                .size(11)
-                .style(move |_| text::Style { 
-                    color: Some(colors.prompt.into()) // On utilise 'prompt' pour l'alerte
-                })
-        );
+        col = col.push(text(help).size(11).style(move |_| text::Style {
+            color: Some(colors.prompt.into()), // On utilise 'prompt' pour l'alerte
+        }));
     }
 
     col.into()

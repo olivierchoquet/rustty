@@ -62,7 +62,6 @@ pub fn view(app: &MyApp) -> Element<'_, Message> {
         ..Default::default()
     });
 
-    // --- 2. ZONE DE LOGS (LE TERMINAL) ---
    // --- 2. ZONE DE LOGS (LE TERMINAL) ---
     let terminal_logs = scrollable(
         container(
@@ -179,58 +178,60 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             app.current_profile.theme = new_theme;
         }
 
-        Message::SshData(new_segments) => {
-            for segment in new_segments {
-                // 1. Si on a des retours à la ligne dans le segment
-                if segment.content.contains('\n') {
-                    let parts: Vec<&str> = segment.content.split('\n').collect();
+    Message::SshData(new_segments) => {
+        for segment in new_segments {
+            // 1. Si on a des retours à la ligne dans le segment
+            if segment.content.contains('\n') {
+                let parts: Vec<&str> = segment.content.split('\n').collect();
 
-                    for (i, part) in parts.iter().enumerate() {
-                        // On ajoute le texte au segment actuel
-                        if !part.is_empty() || i == 0 {
-                            let last_line = app.terminal_lines.last_mut();
-                            if let Some(line) = last_line {
-                                line.push(TextSegment {
-                                    content: part.to_string(),
-                                    color: segment.color,
-                                    is_bold: segment.is_bold,
-                                });
-                            } else {
-                                app.terminal_lines.push(vec![TextSegment {
-                                    content: part.to_string(),
-                                    color: segment.color,
-                                    is_bold: segment.is_bold,
-                                }]);
-                            }
-                        }
-
-                        // Si ce n'est pas le dernier morceau, on crée une nouvelle ligne
-                        if i < parts.len() - 1 {
-                            app.terminal_lines.push(Vec::new());
+                for (i, part) in parts.iter().enumerate() {
+                    // On ajoute le texte au segment actuel
+                    if !part.is_empty() || i == 0 {
+                        let last_line = app.terminal_lines.last_mut();
+                        if let Some(line) = last_line {
+                            line.push(TextSegment {
+                                content: part.to_string(),
+                                color: segment.color,
+                                is_bold: segment.is_bold,
+                            });
+                        } else {
+                            app.terminal_lines.push(vec![TextSegment {
+                                content: part.to_string(),
+                                color: segment.color,
+                                is_bold: segment.is_bold,
+                            }]);
                         }
                     }
-                } else {
-                    // 2. Pas de retour à la ligne, on ajoute juste à la fin
-                    if let Some(line) = app.terminal_lines.last_mut() {
-                        line.push(segment);
-                    } else {
-                        app.terminal_lines.push(vec![segment]);
+
+                    // Si ce n'est pas le dernier morceau, on crée une nouvelle ligne
+                    if i < parts.len() - 1 {
+                        app.terminal_lines.push(Vec::new());
                     }
                 }
+            } else {
+                // 2. Pas de retour à la ligne, on ajoute juste à la fin
+                if let Some(line) = app.terminal_lines.last_mut() {
+                    line.push(segment);
+                } else {
+                    app.terminal_lines.push(vec![segment]);
+                }
             }
-
-            // --- TON NETTOYAGE ---
-            // Limiter le nombre de lignes (beaucoup plus simple maintenant !)
-            if app.terminal_lines.len() > MAX_TERMINAL_LINES {
-                let to_remove = app.terminal_lines.len() - MAX_TERMINAL_LINES;
-                app.terminal_lines.drain(0..to_remove);
-            }
-
-            // --- AJOUT ICI : Le Snap to Bottom ---
-            // On envoie la commande de scroll tout en bas
-            //scrollable::snap_to_bottom(scrollable::Id::new(SCROLLABLE_ID))
-            //scrollable::snap_to_bottom(scrollable::Id::new(SCROLLABLE_ID))
         }
+
+        // --- TON NETTOYAGE ---
+        // Limiter le nombre de lignes (beaucoup plus simple maintenant !)
+        if app.terminal_lines.len() > MAX_TERMINAL_LINES {
+            let to_remove = app.terminal_lines.len() - MAX_TERMINAL_LINES;
+            app.terminal_lines.drain(0..to_remove);
+        }
+
+        // --- AJOUT ICI : Le Snap to Bottom ---
+        // On envoie la commande de scroll tout en bas
+        return scrollable::snap_to(
+            scrollable::Id::new(SCROLLABLE_ID), 
+            scrollable::RelativeOffset::END
+        );
+    }
 
         Message::SendCommand => {
             if !app.terminal_input.is_empty() {
