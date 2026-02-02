@@ -9,8 +9,9 @@ use std::sync::Arc;
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
 // Mes modules internes
-use crate::ssh::{MyHandler, SshChannel, TextSegment};
+use crate::ssh::{MyHandler, SshChannel};
 use crate::ui::theme::{TerminalColors, ThemeChoice};
+use vt100;
 
 pub mod components;
 pub mod terminal;
@@ -40,9 +41,9 @@ pub enum Message {
     SshConnected(Result<Arc<Mutex<russh::client::Handle<MyHandler>>>, String>),
     TerminalWindowOpened(window::Id),
     SetChannel(Arc<Mutex<SshChannel>>),
-    SshData(Vec<TextSegment>),
-    InputTerminal(String),
-    SendCommand,
+    //InputTerminal(String),
+    KeyPressed(iced::keyboard::Key, iced::keyboard::Modifiers),
+    SshData(Vec<u8>),
     DoNothing,
     WindowClosed(window::Id),
     HistoryPrev,
@@ -60,6 +61,7 @@ pub enum Message {
     SectionChanged(EditSection),
     ThemeChanged(ThemeChoice),
     QuitRequested,
+    RawKey(Vec<u8>)
 }
 
 // Implémentation de Debug pour Message pour faciliter le débogage
@@ -99,7 +101,8 @@ pub struct MyApp {
     pub password: String,
     //pub logs: Vec<TextSegment>, // Contient tout le texte affiché dans le terminal
     // Une liste de lignes. Chaque ligne contient ses segments colorés.
-    pub terminal_lines: Vec<Vec<TextSegment>>,
+    // pub terminal_lines: Vec<Vec<TextSegment>>,
+    pub parser: vt100::Parser,
     pub login_window_id: Option<window::Id>,
     pub terminal_window_id: Option<window::Id>,
     pub active_channel: Option<Arc<Mutex<SshChannel>>>, // La session SSH active
@@ -128,7 +131,8 @@ impl MyApp {
         Self {
             password: "".into(),
             //logs: String::from("Prêt...\n"),
-            terminal_lines: Vec::new(),
+            // On initialise un terminal de 24 lignes et 80 colonnes
+            parser: vt100::Parser::new(24, 80, 0),
             login_window_id: Some(login_id),
             terminal_window_id: None,
             active_channel: None,
@@ -202,7 +206,7 @@ impl MyApp {
                 let h_lock = handle.lock().await;
                 if let Ok(ch) = h_lock.channel_open_session().await {
                     let _ = ch
-                        .request_pty(true, "xterm-256color", 100, 30, 0, 0, &[])
+                        .request_pty(true, "xterm-256color", 80, 24, 0, 0, &[])
                         .await;
                     let _ = ch.request_shell(true).await;
                     return Some(Arc::new(Mutex::new(ch)));
@@ -249,15 +253,12 @@ impl MyApp {
             Message::ButtonConnection => self.perform_ssh_connection(),
             Message::SshConnected(Ok(handle)) => self.open_terminal(handle),
             Message::SshConnected(Err(e)) => {
-                //self.terminal_lines.push(vec![TextSegment::new(format!("Erreur: {}\n", e))]);
-                //Task::none()
-                // On crée une ligne contenant un seul segment rouge
-                let error_line = vec![TextSegment::new(
-                    format!("Erreur: {}", e),
-                    Color::from_rgb(0.9, 0.3, 0.3), // Un beau rouge pour l'alerte
-                )];
+                let error_msg = format!("\r\nErreur de connexion: {}\r\n", e);
 
-                self.terminal_lines.push(error_line);
+                // On "trompe" le parser en lui faisant croire que le serveur
+                // a envoyé ce texte. On utilise \r\n pour être sûr d'aller à la ligne.
+                self.parser.process(error_msg.as_bytes());
+
                 Task::none()
             }
 
@@ -283,9 +284,8 @@ impl MyApp {
             Message::SshData(_)
             | Message::HistoryPrev
             | Message::HistoryNext
-            | Message::SendCommand
             | Message::SetChannel(_)
-            | Message::InputTerminal(_)
+            | Message::KeyPressed(_, _) => terminal::update(self, message),
             | Message::ThemeSelected(_) => terminal::update(self, message),
 
             // Gestion globale (Fenêtres)
