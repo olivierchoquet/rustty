@@ -235,10 +235,11 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
                     // On gère les commandes avant les caractères pour éviter les doublons
                     iced::keyboard::Key::Named(named) => match named {
                         iced::keyboard::key::Named::Enter => {
-                            println!("ENVOI: Entrée (CR + LF)");
-                            // On envoie 13 et 10 ensemble. C'est la validation universelle.
-                            to_send = Some(b"\r\n".to_vec());
-                            //to_send = Some(b"\r".to_vec());
+                            // Avec le PTY configuré sur ICRNL, on envoie le code standard 13.
+                            // Le serveur le transformera en 10 (LF) pour Bash.
+                            let bytes = vec![13];
+                            println!("DEBUG: Touche ENTER détectée, envoi de: [13]");
+                            to_send = Some(bytes);
                         }
                         iced::keyboard::key::Named::Backspace => to_send = Some(b"\x7f".to_vec()),
                         iced::keyboard::key::Named::Space => to_send = Some(b" ".to_vec()),

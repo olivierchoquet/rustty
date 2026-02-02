@@ -13,6 +13,7 @@ use crate::ssh::{MyHandler, SshChannel};
 use crate::ui::theme::{TerminalColors, ThemeChoice};
 use vt100;
 
+
 pub mod components;
 pub mod terminal;
 pub mod theme;
@@ -202,25 +203,48 @@ impl MyApp {
         });
 
         // On crée le vecteur de configuration attendu par request_pty
-        // ONLCR (code 71) permet de transformer les \n en \r\n
-        let terminal_modes = vec![(Pty::ONLCR, 1)];
+
+        //let mut modes = russh::terminal_modes::TerminalModes::default();
+        //modes.set(russh::terminal_modes::TerminalMode::ICRNL, 1); // Transforme CR en NL en entrée
+        //modes.set(russh::terminal_modes::TerminalMode::ONLCR, 1); // Transforme NL en CR-NL en sortie
+
+        // Dans ton code de connexion (pas dans le handler)
+let manual_modes: Vec<(Pty, u32)> = vec![
+    (Pty::ICRNL, 1), // Convertir Carriage Return en Line Feed (Indispensable pour Enter)
+    (Pty::ONLCR, 1), // Convertir Line Feed en CR-LF (Indispensable pour l'affichage)
+];
 
         let shell_task = Task::perform(
-            async move {
-                let h_lock = handle.lock().await;
-                if let Ok(ch) = h_lock.channel_open_session().await {
-                    let _ = ch
-                        .request_pty(true, "xterm-256color", 80, 24, 0, 0, &terminal_modes)
-                        .await;
-                    let _ = ch.request_shell(true).await;
+    async move {
+        // 1. On ouvre la session et on libère le lock IMMÉDIATEMENT
+        let mut ch = {
+            let mut h_lock = handle.lock().await;
+            h_lock.channel_open_session().await.ok()?
+        }; // Le verrou h_lock est relâché ici !
 
-                
-                    return Some(Arc::new(Mutex::new(ch)));
-                }
-                None
-            },
-            |ch| ch.map(Message::SetChannel).unwrap_or(Message::DoNothing),
-        );
+        // 2. Maintenant on peut configurer le canal sans bloquer le reste du client
+        // On remplace les let _ par des vérifications réelles
+        if let Err(e) = ch.request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes).await {
+            eprintln!("Erreur PTY: {:?}", e);
+            return None;
+        }
+
+        // 2. Ouverture Shell
+        ch.request_shell(true).await.ok()?;
+
+        // 3. LE TRUC MAGIQUE : On envoie un saut de ligne tout de suite
+        // pour forcer le Shell à afficher le prompt initial.
+
+let initial_data: &[u8] = &[13]; 
+ch.data(initial_data).await.ok();
+
+
+
+        println!("SYSTÈME: Shell interactif ouvert avec succès.");
+        Some(Arc::new(Mutex::new(ch)))
+    },
+    |ch| ch.map(Message::SetChannel).unwrap_or(Message::DoNothing),
+);
 
         Task::batch(vec![
             win_task.discard(),

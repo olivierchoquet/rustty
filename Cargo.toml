@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 iced = { version = "0.13", features = ["tokio", "multi-window", "image"] }
-russh = "0.45.0"
+russh = { version = "0.45", features = ["vendored-openssl"] }
 russh-keys = "0.40"
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
