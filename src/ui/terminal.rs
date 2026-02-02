@@ -185,17 +185,32 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
         }
 
         // raw_bytes est maintenant un Vec<u8> (les données brutes du SSH)
+        // réception de données SSH
+        // raw_bytes contient les données brutes envoyées par le serveur SSH
         Message::SshData(raw_bytes) => {
-            println!("Data reçue : {:?}", String::from_utf8_lossy(&raw_bytes));
-            app.parser.process(&raw_bytes);
+            // 1. Log pour le debug (pour voir ce que le serveur envoie réellement)
+            let data_str = String::from_utf8_lossy(&raw_bytes);
+            println!("DEBUG SSH RECEIVE: {:?}", data_str);
 
-            let (r, c) = app.parser.screen().size();
-            println!("Taille du parser avant process : {} rows, {} cols", r, c);
+            // 2. Traitement des données avant envoi au parser
+            // On convertit les \r isolés en \r\n pour forcer le saut de ligne dans l'UI
+            if raw_bytes == b"\r" {
+                // Cas spécifique : le serveur répond juste par un retour chariot
+                app.parser.process(b"\r\n");
+            } else if data_str.contains('\r') && !data_str.contains('\n') {
+                // Cas où le bloc contient un \r mais pas de saut de ligne
+                let fixed = data_str.replace("\r", "\r\n");
+                app.parser.process(fixed.as_bytes());
+            } else {
+                // Cas normal : on passe les données telles quelles
+                app.parser.process(&raw_bytes);
+            }
 
+            // 3. Debug de l'état du parser (optionnel, pour vérifier la position du curseur)
             let pos = app.parser.screen().cursor_position();
-            println!("Position curseur après : {:?}", pos);
+            println!("Position curseur après rendu : {:?}", pos);
 
-            // On envoie la commande de scroll tout en bas
+            // 4. On force le scroll automatique vers le bas pour voir les nouveaux résultats
             return scrollable::snap_to::<Message>(
                 scrollable::Id::new(SCROLLABLE_ID),
                 scrollable::RelativeOffset::END,
@@ -207,40 +222,26 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             //app.logs.push_str(">> Session SSH établie\n");
         }
 
+        // Envoi de données clavier au SSH
         Message::KeyPressed(key, modifiers) => {
             if let Some(channel) = &app.active_channel {
                 let mut to_send = None;
 
+                // Debug pour voir exactement ce que Iced détecte
                 println!("DEBUG Clavier: Key={:?}, Modifiers={:?}", key, modifiers);
+
                 match key {
-                    // 1. GESTION UNIVERSELLE DES CARACTÈRES (Lettres, Chiffres, Point, Slash, etc.)
-                    iced::keyboard::Key::Character(c) => {
-                        if modifiers.control() {
-                            let char_bytes = c.as_bytes();
-                            if !char_bytes.is_empty() {
-                                to_send = Some(vec![char_bytes[0] & 0x1f]);
-                            }
-                        } else {
-                            // Ici, on capture TOUT : "a", "1", ".", "/", etc.
-
-                            // --- CORRECTIF AZERTY ---
-                            // Si on a Maj + ; et qu'Iced renvoie ";", on force le "."
-                            let char_to_send = if modifiers.shift() && c == ";" {
-                                ".".to_string()
-                            } else if modifiers.shift() && c == ":" {
-                                "/".to_string() // Souvent le même problème pour le slash
-                            } else {
-                                c.to_string()
-                            };
-                            to_send = Some(char_to_send.as_bytes().to_vec());
-                        }
-                    }
-
-                    // 2. TOUCHES NOMMÉES (Touches qui n'ont pas de représentation textuelle directe)
+                    // --- 1. PRIORITÉ AUX TOUCHES NOMMÉES ---
+                    // On gère les commandes avant les caractères pour éviter les doublons
                     iced::keyboard::Key::Named(named) => match named {
-                        iced::keyboard::key::Named::Space => to_send = Some(b" ".to_vec()),
-                        iced::keyboard::key::Named::Enter => to_send = Some(b"\r".to_vec()),
+                        iced::keyboard::key::Named::Enter => {
+                            println!("ENVOI: Entrée (CR + LF)");
+                            // On envoie 13 et 10 ensemble. C'est la validation universelle.
+                            to_send = Some(b"\r\n".to_vec());
+                            //to_send = Some(b"\r".to_vec());
+                        }
                         iced::keyboard::key::Named::Backspace => to_send = Some(b"\x7f".to_vec()),
+                        iced::keyboard::key::Named::Space => to_send = Some(b" ".to_vec()),
                         iced::keyboard::key::Named::Tab => to_send = Some(b"\t".to_vec()),
                         iced::keyboard::key::Named::Escape => to_send = Some(b"\x1b".to_vec()),
                         iced::keyboard::key::Named::ArrowUp => to_send = Some(b"\x1b[A".to_vec()),
@@ -251,22 +252,47 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
                         iced::keyboard::key::Named::ArrowLeft => to_send = Some(b"\x1b[D".to_vec()),
                         _ => {}
                     },
+
+                    // --- 2. GESTION DES CARACTÈRES (AZERTY & CTRL) ---
+                    iced::keyboard::Key::Character(c) => {
+                        if modifiers.control() {
+                            let char_bytes = c.as_bytes();
+                            if !char_bytes.is_empty() {
+                                // Masque binaire pour les commandes CTRL (ex: Ctrl+C)
+                                to_send = Some(vec![char_bytes[0] & 0x1f]);
+                            }
+                        } else {
+                            // On filtre pour éviter d'envoyer des caractères de contrôle via ce bloc
+                            if !c.chars().any(|ch| ch.is_control()) {
+                                let char_to_send = if modifiers.shift() && c == ";" {
+                                    ".".to_string()
+                                } else if modifiers.shift() && c == ":" {
+                                    "/".to_string()
+                                } else {
+                                    c.to_string()
+                                };
+                                to_send = Some(char_to_send.as_bytes().to_vec());
+                            }
+                        }
+                    }
                     _ => {}
                 }
 
+                // --- 3. EXPÉDITION VERS LE SSH ---
                 if let Some(bytes) = to_send {
                     let ch_clone = channel.clone();
                     return Task::perform(
                         async move {
+                            // Utilisation de try_lock pour ne pas bloquer l'UI
                             if let Ok(mut h) = ch_clone.try_lock() {
-                                let _ = h.data(bytes.as_slice()).await;
+                                // .data() attend un AsyncRead, &bytes[..] (slice) l'implémente
+                                let _ = h.data(&bytes[..]).await;
                             }
                         },
                         |_| Message::DoNothing,
                     );
                 }
             }
-            //Task::none()
         }
 
         Message::RawKey(bytes) => {

@@ -2,7 +2,7 @@
 use iced::futures::SinkExt;
 use iced::widget::{Text, text_input};
 use iced::{Color, Element, Task, window};
-use russh::client;
+use russh::{Pty, client};
 use uuid::Uuid;
 // Importation des types pour la gestion de la concurrence
 use std::sync::Arc;
@@ -201,14 +201,20 @@ impl MyApp {
             ..Default::default()
         });
 
+        // On crée le vecteur de configuration attendu par request_pty
+        // ONLCR (code 71) permet de transformer les \n en \r\n
+        let terminal_modes = vec![(Pty::ONLCR, 1)];
+
         let shell_task = Task::perform(
             async move {
                 let h_lock = handle.lock().await;
                 if let Ok(ch) = h_lock.channel_open_session().await {
                     let _ = ch
-                        .request_pty(true, "xterm-256color", 80, 24, 0, 0, &[])
+                        .request_pty(true, "xterm-256color", 80, 24, 0, 0, &terminal_modes)
                         .await;
                     let _ = ch.request_shell(true).await;
+
+                
                     return Some(Arc::new(Mutex::new(ch)));
                 }
                 None
