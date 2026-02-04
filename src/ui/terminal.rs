@@ -184,33 +184,12 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             app.current_profile.theme = new_theme;
         }
 
-        // raw_bytes est maintenant un Vec<u8> (les données brutes du SSH)
-        // réception de données SSH
-        // raw_bytes contient les données brutes envoyées par le serveur SSH
-        Message::SshData(raw_bytes) => {
-            // 1. Log pour le debug (pour voir ce que le serveur envoie réellement)
-            let data_str = String::from_utf8_lossy(&raw_bytes);
-            println!("DEBUG SSH RECEIVE: {:?}", data_str);
+       Message::SshData(raw_bytes) => {
+            // On ne modifie plus les bytes (plus de replace \r par \r\n)
+            // Le parser vt100 et les modes PTY s'en occupent.
+            app.parser.process(&raw_bytes);
 
-            // 2. Traitement des données avant envoi au parser
-            // On convertit les \r isolés en \r\n pour forcer le saut de ligne dans l'UI
-            if raw_bytes == b"\r" {
-                // Cas spécifique : le serveur répond juste par un retour chariot
-                app.parser.process(b"\r\n");
-            } else if data_str.contains('\r') && !data_str.contains('\n') {
-                // Cas où le bloc contient un \r mais pas de saut de ligne
-                let fixed = data_str.replace("\r", "\r\n");
-                app.parser.process(fixed.as_bytes());
-            } else {
-                // Cas normal : on passe les données telles quelles
-                app.parser.process(&raw_bytes);
-            }
-
-            // 3. Debug de l'état du parser (optionnel, pour vérifier la position du curseur)
-            let pos = app.parser.screen().cursor_position();
-            println!("Position curseur après rendu : {:?}", pos);
-
-            // 4. On force le scroll automatique vers le bas pour voir les nouveaux résultats
+            // Auto-scroll vers le bas
             return scrollable::snap_to::<Message>(
                 scrollable::Id::new(SCROLLABLE_ID),
                 scrollable::RelativeOffset::END,
@@ -219,28 +198,59 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
 
         Message::SetChannel(ch) => {
             app.active_channel = Some(ch);
-            //app.logs.push_str(">> Session SSH établie\n");
+            //Task::none()
         }
+    
+
+      
 
         // Envoi de données clavier au SSH
    // Dans ton update(message)
 
-    Message::KeyPressed(key, _modifiers) => {
-        if let Some(bytes) = map_key_to_ssh(key) {
-            let ch_clone = app.active_channel.clone();
-            
-            return Task::perform(
-                async move {
-                    if let Some(ch) = ch_clone {
-                        let mut h = ch.lock().await;
-                        // On envoie direct les octets !
-                        let _ = h.data(&bytes[..]).await;
-                    }
-                },
-                |_| Message::DoNothing,
-            );
-        }
+
+Message::KeyPressed(key, _modifiers) => {
+    // 1. On transforme la touche Iced en octets SSH
+    // Note : map_key_to_ssh doit renvoyer b"\r\n" pour Named::Enter
+    if let Some(bytes) = map_key_to_ssh(key) {
+        
+        // 2. On clone l'Arc pour le déplacer dans le futur (Task)
+        let channel_arc = app.active_channel.clone();
+        
+        // 3. On utilise Task::perform pour ne pas bloquer l'UI pendant l'attente du Lock
+        return Task::perform(
+            async move {
+                if let Some(arc) = channel_arc {
+                    // LE POINT CRITIQUE : Le lock est pris ici et relâché 
+                    // automatiquement dès que cette fonction asynchrone se termine.
+                    let mut ch = arc.lock().await;
+                    let _ = ch.data(&bytes[..]).await;
+                    
+                    // Optionnel : un petit flush si russh ne le fait pas immédiatement
+                    // let _ = ch.eof(false).await; 
+                }
+            },
+            |_| Message::DoNothing // Une fois envoyé, on ne fait rien de plus
+        );
     }
+    //Task::none()
+}
+
+    // LE MESSAGE D'ENVOI CRUCIAL
+        Message::SendSshRaw(bytes) => {
+            if let Some(ch_arc) = &app.active_channel {
+                let ch_clone = ch_arc.clone();
+                return Task::perform(
+                    async move {
+                        let mut ch = ch_clone.lock().await;
+                        let _ = ch.data(&bytes[..]).await;
+                    },
+                    |_| Message::DoNothing,
+                );
+            }
+           // Task::none()
+        }
+    
+
 
 
         Message::RawKey(bytes) => {
@@ -298,7 +308,7 @@ fn map_key_to_ssh(key: iced::keyboard::Key) -> Option<Vec<u8>> {
         
         // Touches spéciales nommées
         iced::keyboard::Key::Named(named) => match named {
-            Named::Enter => Some(vec![13]),       // Carriage Return
+            Named::Enter => Some(vec![13,10]),       // Carriage Return
             Named::Backspace => Some(vec![127]),   // Code standard Linux pour Backspace
             Named::Tab => Some(vec![9]),
             Named::Escape => Some(vec![27]),

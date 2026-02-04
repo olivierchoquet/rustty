@@ -43,8 +43,9 @@ pub enum Message {
     TerminalWindowOpened(window::Id),
     SetChannel(Arc<Mutex<SshChannel>>),
     //InputTerminal(String),
+    SshData(Vec<u8>),    // RECEPTION (du serveur vers l'UI)
+    SendSshRaw(Vec<u8>), // ENVOI (de l'UI vers le serveur)
     KeyPressed(iced::keyboard::Key, iced::keyboard::Modifiers),
-    SshData(Vec<u8>),
     DoNothing,
     WindowClosed(window::Id),
     HistoryPrev,
@@ -312,10 +313,11 @@ ch.data(initial_data).await.ok();
             }
 
             Message::SshData(_)
+            | Message::SendSshRaw(_)
             | Message::HistoryPrev
             | Message::HistoryNext
             | Message::SetChannel(_)
-            | Message::KeyPressed(_, _) => terminal::update(self, message),
+            | Message::KeyPressed(_,_) => terminal::update(self, message),
             | Message::ThemeSelected(_) => terminal::update(self, message),
 
             // Gestion globale (Fenêtres)
