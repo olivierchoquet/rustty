@@ -223,78 +223,25 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
         }
 
         // Envoi de données clavier au SSH
-        Message::KeyPressed(key, modifiers) => {
-            if let Some(channel) = &app.active_channel {
-                let mut to_send = None;
+   // Dans ton update(message)
 
-                // Debug pour voir exactement ce que Iced détecte
-                println!("DEBUG Clavier: Key={:?}, Modifiers={:?}", key, modifiers);
-
-                match key {
-                    // --- 1. PRIORITÉ AUX TOUCHES NOMMÉES ---
-                    // On gère les commandes avant les caractères pour éviter les doublons
-                    iced::keyboard::Key::Named(named) => match named {
-                        iced::keyboard::key::Named::Enter => {
-                            // Avec le PTY configuré sur ICRNL, on envoie le code standard 13.
-                            // Le serveur le transformera en 10 (LF) pour Bash.
-                            let bytes = vec![13];
-                            println!("DEBUG: Touche ENTER détectée, envoi de: [13]");
-                            to_send = Some(bytes);
-                        }
-                        iced::keyboard::key::Named::Backspace => to_send = Some(b"\x7f".to_vec()),
-                        iced::keyboard::key::Named::Space => to_send = Some(b" ".to_vec()),
-                        iced::keyboard::key::Named::Tab => to_send = Some(b"\t".to_vec()),
-                        iced::keyboard::key::Named::Escape => to_send = Some(b"\x1b".to_vec()),
-                        iced::keyboard::key::Named::ArrowUp => to_send = Some(b"\x1b[A".to_vec()),
-                        iced::keyboard::key::Named::ArrowDown => to_send = Some(b"\x1b[B".to_vec()),
-                        iced::keyboard::key::Named::ArrowRight => {
-                            to_send = Some(b"\x1b[C".to_vec())
-                        }
-                        iced::keyboard::key::Named::ArrowLeft => to_send = Some(b"\x1b[D".to_vec()),
-                        _ => {}
-                    },
-
-                    // --- 2. GESTION DES CARACTÈRES (AZERTY & CTRL) ---
-                    iced::keyboard::Key::Character(c) => {
-                        if modifiers.control() {
-                            let char_bytes = c.as_bytes();
-                            if !char_bytes.is_empty() {
-                                // Masque binaire pour les commandes CTRL (ex: Ctrl+C)
-                                to_send = Some(vec![char_bytes[0] & 0x1f]);
-                            }
-                        } else {
-                            // On filtre pour éviter d'envoyer des caractères de contrôle via ce bloc
-                            if !c.chars().any(|ch| ch.is_control()) {
-                                let char_to_send = if modifiers.shift() && c == ";" {
-                                    ".".to_string()
-                                } else if modifiers.shift() && c == ":" {
-                                    "/".to_string()
-                                } else {
-                                    c.to_string()
-                                };
-                                to_send = Some(char_to_send.as_bytes().to_vec());
-                            }
-                        }
+    Message::KeyPressed(key, _modifiers) => {
+        if let Some(bytes) = map_key_to_ssh(key) {
+            let ch_clone = app.active_channel.clone();
+            
+            return Task::perform(
+                async move {
+                    if let Some(ch) = ch_clone {
+                        let mut h = ch.lock().await;
+                        // On envoie direct les octets !
+                        let _ = h.data(&bytes[..]).await;
                     }
-                    _ => {}
-                }
-
-                // --- 3. EXPÉDITION VERS LE SSH ---
-                if let Some(bytes) = to_send {
-                    let ch_clone = channel.clone();
-                    return Task::perform(
-                        async move {
-                            // Utilisation de try_lock pour ne pas bloquer l'UI
-                            if let Ok(mut h) = ch_clone.try_lock() {
-                                // .data() attend un AsyncRead, &bytes[..] (slice) l'implémente
-                                let _ = h.data(&bytes[..]).await;
-                            }
-                        },
-                        |_| Message::DoNothing,
-                    );
-                }
-            }
+                },
+                |_| Message::DoNothing,
+            );
         }
+    }
+
 
         Message::RawKey(bytes) => {
             if let Some(channel) = &app.active_channel {
@@ -338,5 +285,31 @@ fn vt_to_iced_color(
             }
         }
         vt100::Color::Rgb(r, g, b) => iced::Color::from_rgb8(r, g, b),
+    }
+}
+
+
+fn map_key_to_ssh(key: iced::keyboard::Key) -> Option<Vec<u8>> {
+    use iced::keyboard::key::Named;
+
+    match key {
+        // Touches normales (Lettres, chiffres, symboles)
+        iced::keyboard::Key::Character(c) => Some(c.as_bytes().to_vec()),
+        
+        // Touches spéciales nommées
+        iced::keyboard::Key::Named(named) => match named {
+            Named::Enter => Some(vec![13]),       // Carriage Return
+            Named::Backspace => Some(vec![127]),   // Code standard Linux pour Backspace
+            Named::Tab => Some(vec![9]),
+            Named::Escape => Some(vec![27]),
+            
+            // Flèches directionnelles (Codes ANSI)
+            Named::ArrowUp => Some(vec![27, 91, 65]),    // ESC [ A
+            Named::ArrowDown => Some(vec![27, 91, 66]),  // ESC [ B
+            Named::ArrowRight => Some(vec![27, 91, 67]), // ESC [ C
+            Named::ArrowLeft => Some(vec![27, 91, 68]),  // ESC [ D
+            _ => None,
+        },
+        _ => None,
     }
 }

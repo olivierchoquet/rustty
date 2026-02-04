@@ -1,7 +1,7 @@
 use crate::ui::{Message, theme::TerminalColors};
 use async_trait::async_trait;
 use iced::{Color, futures::channel::mpsc};
-use russh::{client, keys::key};
+use russh::{ChannelId, client::{self, Session}, keys::key};
 
 pub type SshChannel = russh::Channel<russh::client::Msg>;
 
@@ -31,18 +31,12 @@ impl client::Handler for MyHandler {
 
     }*/
 
-    async fn data(
-        &mut self,
-        _id: russh::ChannelId,
-        data: &[u8],
-        _session: &mut client::Session,
-    ) -> Result<(), Self::Error> {
-        // On n'interprète plus rien ici.
-        // On envoie directement les bytes bruts (Vec<u8>) au message.
-        let _ = self.sender.try_send(Message::SshData(data.to_vec()));
-
-        Ok(())
-    }
+async fn data(&mut self, _id: ChannelId, data: &[u8], _session: &mut Session) -> Result<(), Self::Error> {
+    // On envoie les données brutes à l'UI
+    // L'UI devra décider comment les interpréter (soit texte brut, soit codes ANSI)
+    let _ = self.sender.try_send(Message::SshData(data.to_vec()));
+    Ok(())
+}
 }
 
 fn get_ansi_color(code: u8, colors: &TerminalColors) -> Color {
