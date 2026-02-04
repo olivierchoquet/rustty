@@ -108,7 +108,6 @@ pub struct MyApp {
     pub login_window_id: Option<window::Id>,
     pub terminal_window_id: Option<window::Id>,
     pub active_channel: Option<Arc<Mutex<SshChannel>>>, // La session SSH active
-    pub terminal_input: String, // Ce que l'utilisateur tape dans le terminal
     pub history: Vec<String>,   // Liste des commandes passées
     pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
@@ -134,16 +133,13 @@ impl MyApp {
             password: "".into(),
             //logs: String::from("Prêt...\n"),
             // On initialise un terminal de 24 lignes et 80 colonnes
-            parser: vt100::Parser::new(24, 80, 0),
+            parser: vt100::Parser::new(24, 80, MAX_TERMINAL_LINES),
             login_window_id: Some(login_id),
             terminal_window_id: None,
             active_channel: None,
-            terminal_input: String::new(),
             history: Vec::new(),
             history_index: None,
             focus_index: 0,
-            //theme_choice: ThemeChoice::Slate,
-            // chargement des profils sauvegardées
             profiles: loaded_profiles,
             selected_profile_id: None,
             // profil "brouillon" vide au départ
@@ -155,7 +151,7 @@ impl MyApp {
 
     fn perform_ssh_connection(&self) -> Task<Message> {
         //println!("Tentative de connexion à {}...", self.current_profile.ip);
-        let Profile = self.current_profile.ip.clone();
+        let profile = self.current_profile.ip.clone();
         let user = self.current_profile.username.clone();
         let pass = self.password.clone();
         let port = self.current_profile.port.parse::<u16>().unwrap_or(22);
@@ -163,13 +159,10 @@ impl MyApp {
         Task::stream(iced::stream::channel(100, move |mut output| async move {
             let config = Arc::new(client::Config::default());
             let handler = MyHandler {
-                sender: output.clone(),
-                current_color: iced::Color::WHITE,
-                is_bold: false,
-                colors_config: TerminalColors::default(),
+                sender: output.clone()
             };
 
-            if let Ok(mut handle) = client::connect(config, (Profile.as_str(), port), handler).await
+            if let Ok(mut handle) = client::connect(config, (profile.as_str(), port), handler).await
             {
                 if handle
                     .authenticate_password(user, pass)

@@ -1,6 +1,6 @@
 use std::os::linux::raw;
 
-use crate::ui::theme::{self, ThemeChoice};
+use crate::ui::theme::{self, TerminalColors, ThemeChoice};
 use crate::ui::{MAX_TERMINAL_LINES, Message, MyApp, SCROLLABLE_ID};
 
 use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
@@ -9,173 +9,145 @@ use vt100;
 
 pub fn view(app: &MyApp) -> Element<'_, Message> {
     let colors = app.current_profile.theme.get_colors();
-
-    // --- 1. BARRE D'ONGLETS & SÉLECTEUR ---
-    let tab_bar = container(
-        row![
-            container(
-                text(format!(" 🐚 {} ", &app.current_profile.ip))
-                    .size(13)
-                    .font(iced::Font::MONOSPACE)
-                    .color(colors.text)
-            )
-            .padding([6, 18])
-            .style(move |_| container::Style {
-                background: Some(colors.bg.into()),
-                border: iced::Border {
-                    width: 1.0,
-                    color: colors.accent,
-                    radius: iced::border::Radius {
-                        top_left: 6.0,
-                        top_right: 6.0,
-                        ..Default::default()
-                    },
-                },
-                ..Default::default()
-            }),
-            pick_list(
-                &ThemeChoice::ALL[..],
-                Some(app.current_profile.theme),
-                Message::ThemeSelected
-            )
-            .text_size(12)
-            .padding(5),
-            button(text("+").size(16)).style(button::text).padding(10),
-        ]
-        .spacing(15)
-        .align_y(Alignment::Center), //.padding([8, 12, 0, 12]),
-    )
-    .width(Length::Fill)
-    .style(move |_| container::Style {
-        background: Some(colors.surface.into()),
-        ..Default::default()
-    });
-
-    // --- 2. ZONE DE LOGS (DIAGNOSTIC TEST) ---
     let screen = app.parser.screen();
     let (rows, cols) = screen.size();
     let (cursor_row, cursor_col) = screen.cursor_position();
 
-    let terminal_logs = scrollable(
-        container(
-            column(
-                (0..rows)
-                    .map(|row_idx| {
-                        let mut line_elements = Vec::new();
-                        let mut current_text = String::new();
-                        let mut current_fg = vt100::Color::Default;
+    // On pré-clône les couleurs pour les closures de la barre d'onglets et d'état
+    let tab_colors = colors.clone();
+    let status_colors = colors.clone();
+    let bg_color_final = colors.bg;
 
-                        // --- LE TEST ULTIME : On ajoute un numéro de ligne à gauche ---
-                        // Si tu vois "ss" à côté du même numéro de ligne, le serveur fait un echo.
-                        line_elements.push(
-                            text(format!("{:2} | ", row_idx))
-                                .size(12)
-                                .color(colors.accent.clone()) // Utilise une couleur visible
-                                .font(iced::Font::MONOSPACE)
-                                .into(),
-                        );
-
-                        for col_idx in 0..cols {
-                            let is_cursor =
-                                row_idx as u16 == cursor_row && col_idx as u16 == cursor_col;
-
-                            if let Some(cell) = screen.cell(row_idx, col_idx) {
-                                let fg = cell.fgcolor();
-                                let content = cell.contents();
-
-                                // On traite le contenu : si vide et pas curseur, un espace suffit
-                                let display_char = if content.is_empty() { " " } else { &content };
-
-                                // Si le style change ou qu'on arrive au curseur, on vide le buffer
-                                if (fg != current_fg || is_cursor) && !current_text.is_empty() {
-                                    line_elements.push(
-                                        text(current_text.clone())
-                                            .font(iced::Font::MONOSPACE)
-                                            .size(15)
-                                            .color(vt_to_iced_color(current_fg, &colors))
-                                            .into(),
-                                    );
-                                    current_text.clear();
-                                }
-
-                                if is_cursor {
-                                    line_elements.push(
-                                        container(
-                                            text(display_char.to_string())
-                                                .font(iced::Font::MONOSPACE)
-                                                .size(15)
-                                                .color(colors.bg),
-                                        )
-                                        .style(move |_| container::Style {
-                                            background: Some(vt_to_iced_color(fg, &colors).into()),
-                                            ..Default::default()
-                                        })
-                                        .into(),
-                                    );
-                                    // Après le curseur, on repart sur la couleur de la cellule
-                                    current_fg = fg;
-                                } else {
-                                    current_fg = fg;
-                                    current_text.push_str(display_char);
-                                }
-                            }
-                        }
-
-                        // On vide le dernier morceau de texte de la ligne
-                        if !current_text.is_empty() {
-                            line_elements.push(
-                                text(current_text)
-                                    .font(iced::Font::MONOSPACE)
-                                    .size(15)
-                                    .color(vt_to_iced_color(current_fg, &colors))
-                                    .into(),
-                            );
-                        }
-
-                        row(line_elements).spacing(0).into()
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .spacing(0),
-        )
-        .padding(25.0)
-        .width(Length::Fill),
-    )
-    .id(scrollable::Id::new(SCROLLABLE_ID))
-    .height(Length::Fill);
-    // --- 3. BARRE D'ÉTAT ---
-    let status_bar = container(
+    // --- 1. BARRE D'ONGLETS (Header) ---
+    let tab_bar = container(
         row![
-            container(
-                text(format!(" ● CONNECTED: {} ", app.current_profile.username))
-                    .size(11)
-                    .color(colors.bg)
-            )
-            .padding([3, 10])
+            container(text(format!(" 🐚 {} ", &app.current_profile.ip))
+                .size(13)
+                .font(iced::Font::MONOSPACE)
+                .color(colors.text))
+            .padding([6, 18])
             .style(move |_| container::Style {
-                background: Some(colors.prompt.into()),
+                background: Some(tab_colors.bg.into()),
                 border: iced::Border {
-                    radius: 4.0.into(),
-                    ..Default::default()
+                    width: 1.0,
+                    color: tab_colors.accent,
+                    radius: iced::border::Radius { top_left: 6.0, top_right: 6.0, ..Default::default() },
                 },
                 ..Default::default()
             }),
-            text(format!(" {}x{} ", cols, rows))
-                .size(11)
-                .color(colors.accent)
-                .font(iced::Font::MONOSPACE)
+            pick_list(&ThemeChoice::ALL[..], Some(app.current_profile.theme), Message::ThemeSelected)
+                .text_size(12)
+                .padding(5),
+            button(text("+").size(16)).style(iced::widget::button::text).padding(10),
+        ]
+        .spacing(15)
+        .align_y(Alignment::Center),
+    )
+    .width(Length::Fill)
+    .style(move |_| container::Style { 
+        background: Some(tab_colors.surface.into()), 
+        ..Default::default() 
+    });
+
+    // --- 2. ZONE TERMINAL ---
+    let terminal_content = column((0..rows).map(|row_idx| {
+        let mut line_elements = Vec::new();
+        let mut current_text = String::new();
+        let mut current_fg = vt100::Color::Default;
+
+        for col_idx in 0..cols {
+            let is_cursor = row_idx as u16 == cursor_row && col_idx as u16 == cursor_col;
+            
+            if let Some(cell) = screen.cell(row_idx, col_idx) {
+                let fg = cell.fgcolor();
+                let content = cell.contents();
+                let display_char = if content.is_empty() { " " } else { content.as_str() };
+
+                if (fg != current_fg || is_cursor) && !current_text.is_empty() {
+                    // On passe colors par valeur (cloné)
+                    line_elements.push(render_text_chunk(current_text.clone(), current_fg, colors.clone()));
+                    current_text.clear();
+                }
+
+                if is_cursor {
+                    line_elements.push(render_cursor(display_char.to_string(), fg, colors.clone()));
+                    current_fg = fg;
+                } else {
+                    current_fg = fg;
+                    current_text.push_str(display_char);
+                }
+            }
+        }
+        
+        if !current_text.is_empty() {
+            line_elements.push(render_text_chunk(current_text, current_fg, colors.clone()));
+        }
+
+        row(line_elements).spacing(0).into()
+    }).collect::<Vec<_>>()).spacing(0);
+
+    let terminal_scroll = scrollable(
+        container(terminal_content)
+            .padding(20)
+            .width(Length::Fill)
+            .style(move |_| container::Style { 
+                background: Some(bg_color_final.into()), 
+                ..Default::default() 
+            })
+    )
+    .id(scrollable::Id::new(SCROLLABLE_ID))
+    .height(Length::Fill);
+
+    // --- 3. BARRE D'ÉTAT (Footer) ---
+    let status_bar = container(
+        row![
+            container(text(format!(" ● {} ", app.current_profile.username)).size(11).color(status_colors.bg))
+                .padding([3, 10])
+                .style(move |_| container::Style {
+                    background: Some(status_colors.prompt.into()),
+                    border: iced::Border { radius: 4.0.into(), ..Default::default() },
+                    ..Default::default()
+                }),
+            text(format!(" Terminal: {}x{} ", cols, rows)).size(11).color(status_colors.accent).font(iced::Font::MONOSPACE)
         ]
         .spacing(12)
         .align_y(Alignment::Center)
         .padding(10),
     )
     .width(Length::Fill)
-    .style(move |_| container::Style {
-        background: Some(colors.surface.into()),
-        ..Default::default()
+    .style(move |_| container::Style { 
+        background: Some(status_colors.surface.into()), 
+        ..Default::default() 
     });
 
-    column![tab_bar, terminal_logs, status_bar].into()
+    column![tab_bar, terminal_scroll, status_bar].into()
+}
+
+// --- HELPERS CORRIGÉS (Plus de références &) ---
+
+fn render_text_chunk(txt: String, vt_color: vt100::Color, colors: TerminalColors) -> Element<'static, Message> {
+    text(txt)
+        .font(iced::Font::MONOSPACE)
+        .size(15)
+        .color(vt_to_iced_color(vt_color, &colors))
+        .into()
+}
+
+fn render_cursor(char_str: String, vt_color: vt100::Color, colors: TerminalColors) -> Element<'static, Message> {
+    let cursor_bg = vt_to_iced_color(vt_color, &colors);
+    let cursor_fg = colors.bg;
+
+    container(
+        text(char_str)
+            .font(iced::Font::MONOSPACE)
+            .size(15)
+            .color(cursor_fg) 
+    )
+    .style(move |_| container::Style {
+        background: Some(cursor_bg.into()),
+        ..Default::default()
+    })
+    .into()
 }
 
 pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
