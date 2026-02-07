@@ -50,7 +50,7 @@ fn nav_button<'a>(
         .padding(10)
         .style(move |_, status| {
             // 1. On récupère le style de base
-            let mut s = theme::button_style(colors, status);
+            let mut s = theme::button_style(colors, status,theme::ButtonVariant::Secondary);
 
             // 2. ON ÉCRASE SYSTÉMATIQUEMENT SI ACTIF
             if is_active {

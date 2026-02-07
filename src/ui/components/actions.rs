@@ -16,32 +16,30 @@ pub fn buttons_form<'a>(colors: TerminalColors, is_editing: bool) -> Element<'a,
     let content = row![
         button("Nouveau")
             .on_press(Message::NewProfile)
-            .style(iced::widget::button::secondary), 
+            .style(move |_, s| theme::button_style(c1, s,theme::ButtonVariant::Secondary)), 
             
         button(text(texte_bouton).center())
             .on_press(Message::SaveProfile)
             .padding(10)
-            .style(move |_, s| theme::button_style(c1, s)),
+            .style(move |_, s| theme::button_style(c1, s,theme::ButtonVariant::Secondary)),
 
         button(text("Supprimer").center())
             .on_press(Message::DeleteProfile)
             .padding(10)
-            .style(move |_, s| theme::button_style(c2, s)),
+            .style(move |_, s| theme::button_style(c2, s,theme::ButtonVariant::Secondary)),
 
         button(text("Démarrer SSH").center())
             .on_press(Message::ButtonConnection)
             .padding(10)
-            .style(move |_, s| crate::ui::theme::active_button_style(c3, s)),
+            .style(move |_, s| theme::button_style(c3, s,theme::ButtonVariant::Primary)),
 
         button(text("Quitter").center())
             .padding(10)
             .on_press(Message::QuitRequested)
-            .style(move |_, s| theme::button_style(c4, s))
+            .style(move |_, s| theme::button_style(c4, s,theme::ButtonVariant::Secondary))
     ]
     .spacing(20)
     .align_y(Alignment::Center);
-
-    // LE FIX : On utilise center_x pour centrer la row dans le container
     container(content)
         .width(Length::Fill)
         .center_x(Length::Fill) // <--- Ajoute ceci pour le centrage horizontal

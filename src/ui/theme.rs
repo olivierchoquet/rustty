@@ -184,6 +184,7 @@ pub struct TerminalColors {
     pub surface: Color,
 }
 
+
 // Default == Slate Theme
 impl Default for TerminalColors {
     fn default() -> Self {
@@ -197,7 +198,47 @@ impl Default for TerminalColors {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum ButtonVariant {
+    Primary,
+    Secondary,
+    Danger, // Optionnel : pour le bouton "Supprimer"
+}
+
+
 // --- FONCTIONS DE STYLE ---
+
+
+pub fn button_style(
+    colors: TerminalColors,
+    status: button::Status,
+    variant: ButtonVariant,
+) -> button::Style {
+    // 1. On définit les couleurs selon la variante
+    let (bg_base, txt_color) = match variant {
+        ButtonVariant::Primary => (colors.accent, colors.bg),
+        ButtonVariant::Secondary => (colors.surface, colors.text),
+        ButtonVariant::Danger => (Color::from_rgb(0.8, 0.2, 0.2), Color::WHITE),
+    };
+
+    // 2. On ajuste l'intensité selon l'état (Survol / Clic)
+    let final_bg = match status {
+        button::Status::Hovered => Color { a: 1.0, ..bg_base },
+        button::Status::Pressed => Color { a: 0.7, ..bg_base },
+        _ => Color { a: 0.85, ..bg_base }, // Un peu plus doux au repos
+    };
+
+    button::Style {
+        background: Some(final_bg.into()),
+        text_color: txt_color,
+        border: Border {
+            radius: 6.0.into(),
+            width: if let ButtonVariant::Secondary = variant { 1.0 } else { 0.0 },
+            color: colors.accent,
+        },
+        ..Default::default()
+    }
+}
 
 pub fn input_style(colors: TerminalColors, status: text_input::Status) -> text_input::Style {
     let border_color = match status {
@@ -227,50 +268,3 @@ pub fn main_container_style(colors: TerminalColors) -> container::Style {
     }
 }
 
-// Style standard pour les boutons (Sauvegarder, Annuler, etc.)
-
-pub fn button_style(colors: TerminalColors, status: button::Status) -> button::Style {
-    // On définit une opacité différente au survol
-    let bg_color = match status {
-        button::Status::Hovered => colors.accent,
-        _ => Color {
-            a: 0.9,
-            ..colors.accent
-        },
-    };
-
-    button::Style {
-        background: Some(bg_color.into()),
-        text_color: colors.bg, // Texte contrasté (souvent noir/sombre) sur le bouton "Accent"
-        border: Border {
-            radius: 6.0.into(),
-            ..Default::default()
-        },
-        shadow: Shadow::default(),
-    }
-}
-
-// Style "Accent" pour les actions principales (Démarrer SSH)
-pub fn active_button_style(
-    colors: TerminalColors,
-    status: iced::widget::button::Status,
-) -> iced::widget::button::Style {
-    let base = iced::widget::button::Style {
-        background: Some(iced::Background::Color(colors.accent)),
-        text_color: colors.bg, // Texte sombre sur fond brillant
-        border: iced::Border {
-            color: colors.accent,
-            width: 1.0,
-            radius: 5.0.into(),
-        },
-        ..Default::default()
-    };
-
-    match status {
-        iced::widget::button::Status::Hovered => iced::widget::button::Style {
-            background: Some(iced::Background::Color(colors.text)),
-            ..base
-        },
-        _ => base,
-    }
-}

@@ -108,7 +108,9 @@ fn render_input_with_label<'a>(
             .secure(is_secure)
             .on_submit(on_submit_message.unwrap_or(Message::DoNothing)),
     ]
-    .spacing(5);
+    .spacing(5)
+    .width(Length::Fill) // Prend toute la largeur dispo
+    .height(Length::Shrink); // Ne prend QUE la hauteur nécessaire
 
     // 3. Helper Text utilisant une couleur d'alerte du thème
     if let Some(help) = helper_text {
@@ -193,7 +195,7 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
         )
         .on_press(Message::ThemeChanged(*theme))
         .style(move |_, status| {
-            let mut s = theme::button_style(colors, status);
+            let mut s = theme::button_style(colors, status, theme::ButtonVariant::Secondary);
             if is_selected {
                 s.border.width = 2.0;
                 s.border.color = colors.accent;

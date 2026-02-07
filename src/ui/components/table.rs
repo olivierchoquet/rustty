@@ -76,7 +76,7 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
                 .width(Length::Fill)
                 .on_press(Message::ProfileSelected(profile.id))
                 .style(move |_, status| {
-                    let mut st = theme::button_style(colors, status);
+                    let mut st = theme::button_style(colors, status,theme::ButtonVariant::Secondary);
                     if is_selected {
                         st.background = Some(colors.prompt.into());
                         st.text_color = colors.accent;
