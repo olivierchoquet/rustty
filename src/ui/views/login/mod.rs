@@ -109,6 +109,7 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
         Message::InputUsername(u) => app.current_profile.username = u,
         Message::InputPass(p) => app.password = p,
         Message::TabPressed => {
+            println!("DEBUG: Tab Pressed - Current focus index before: {}", app.focus_index);
             // Gérer la navigation par Tab entre les champs de saisie
             app.focus_index = (app.focus_index + 1) % 4;
             let target_id = match app.focus_index {

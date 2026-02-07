@@ -1,8 +1,10 @@
 use std::os::linux::raw;
 
 use crate::ui::theme::{self, TerminalColors, ThemeChoice};
-use crate::ui::{MAX_TERMINAL_LINES, Message, MyApp, SCROLLABLE_ID};
+use crate::ui::{ID_IP, ID_PASS, ID_PORT, ID_USER, MAX_TERMINAL_LINES, Message, MyApp, SCROLLABLE_ID};
 
+use iced::keyboard::key::Named;
+use iced::keyboard::{Key, Modifiers};
 use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length, Task};
 use vt100;
@@ -207,6 +209,8 @@ Message::KeyPressed(key, _modifiers) => {
     //Task::none()
 }
 
+
+
     // LE MESSAGE D'ENVOI CRUCIAL
         Message::SendSshRaw(bytes) => {
             if let Some(ch_arc) = &app.active_channel {
@@ -295,3 +299,7 @@ fn map_key_to_ssh(key: iced::keyboard::Key) -> Option<Vec<u8>> {
         _ => None,
     }
 }
+
+
+
+

@@ -1,7 +1,9 @@
 // iced::futures::SinkExt est nécessaire pour l'envoi asynchrone de messages
 use iced::futures::SinkExt;
-use iced::widget::{Text, text_input};
-use iced::{Color, Element, Task, window};
+use iced::keyboard::key::Named;
+use iced::keyboard::{Key, Modifiers};
+use iced::widget::text_input;
+use iced::{Element, Task, window};
 use russh::{Pty, client};
 use uuid::Uuid;
 // Importation des types pour la gestion de la concurrence
@@ -10,9 +12,9 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 // Mes modules internes
 use crate::ssh::{MyHandler, SshChannel};
-use crate::ui::theme::{TerminalColors, ThemeChoice};
+use crate::ui::theme::ThemeChoice;
+use crate::ui::views::login;
 use vt100;
-
 
 pub mod components;
 pub mod terminal;
@@ -26,6 +28,8 @@ pub const SCROLLABLE_ID: &str = "terminal_scroll";
 const MAX_TERMINAL_LINES: usize = 1000;
 
 // Identifiants pour le focus - touche tabulation
+pub const ID_PROFILE: &str = "profile_input";
+pub const ID_GROUP: &str = "group_input";
 pub const ID_IP: &str = "ip_input";
 pub const ID_PORT: &str = "port_input";
 pub const ID_USER: &str = "user_input";
@@ -42,9 +46,9 @@ pub enum Message {
     SshConnected(Result<Arc<Mutex<russh::client::Handle<MyHandler>>>, String>),
     TerminalWindowOpened(window::Id),
     SetChannel(Arc<Mutex<SshChannel>>),
-    //InputTerminal(String),
-    SshData(Vec<u8>),    // RECEPTION (du serveur vers l'UI)
-    SendSshRaw(Vec<u8>), // ENVOI (de l'UI vers le serveur)
+    SshData(Vec<u8>),           // RECEPTION (du serveur vers l'UI)
+    SendSshRaw(Vec<u8>),        // ENVOI (de l'UI vers le serveur)
+    KeyboardEvent(iced::Event), // Nouveaux messages pour les événements clavier
     KeyPressed(iced::keyboard::Key, iced::keyboard::Modifiers),
     DoNothing,
     WindowClosed(window::Id),
@@ -63,7 +67,7 @@ pub enum Message {
     SectionChanged(EditSection),
     ThemeChanged(ThemeChoice),
     QuitRequested,
-    RawKey(Vec<u8>)
+    RawKey(Vec<u8>),
 }
 
 // Implémentation de Debug pour Message pour faciliter le débogage
@@ -108,9 +112,9 @@ pub struct MyApp {
     pub login_window_id: Option<window::Id>,
     pub terminal_window_id: Option<window::Id>,
     pub active_channel: Option<Arc<Mutex<SshChannel>>>, // La session SSH active
-    pub history: Vec<String>,   // Liste des commandes passées
-    pub history_index: Option<usize>, // Position actuelle dans l'historique
-    pub focus_index: usize,     // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
+    pub history: Vec<String>,                           // Liste des commandes passées
+    pub history_index: Option<usize>,                   // Position actuelle dans l'historique
+    pub focus_index: usize,                             // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
     // pub theme_choice: ThemeChoice,
     // Gestion des profils
     pub current_profile: Profile, // Le "brouillon" lié aux inputs
@@ -120,6 +124,7 @@ pub struct MyApp {
     pub search_query: String, // Pour le filtrage global
     // Catégorie de parammètres en cours d'édition
     pub active_section: EditSection,
+    pub focused_id: &'static str, // Pour gérer le focus des TextInput (IP, Port, User, Pass)
 }
 
 impl MyApp {
@@ -146,8 +151,9 @@ impl MyApp {
             current_profile: Profile::default(),
             search_query: "".into(),
             active_section: EditSection::General,
-        }
+            focused_id: ID_PROFILE, // On commence par le champ profil
     }
+}
 
     fn perform_ssh_connection(&self) -> Task<Message> {
         //println!("Tentative de connexion à {}...", self.current_profile.ip);
@@ -159,7 +165,7 @@ impl MyApp {
         Task::stream(iced::stream::channel(100, move |mut output| async move {
             let config = Arc::new(client::Config::default());
             let handler = MyHandler {
-                sender: output.clone()
+                sender: output.clone(),
             };
 
             if let Ok(mut handle) = client::connect(config, (profile.as_str(), port), handler).await
@@ -203,42 +209,43 @@ impl MyApp {
         //modes.set(russh::terminal_modes::TerminalMode::ONLCR, 1); // Transforme NL en CR-NL en sortie
 
         // Dans ton code de connexion (pas dans le handler)
-let manual_modes: Vec<(Pty, u32)> = vec![
-    (Pty::ICRNL, 1), // Convertir Carriage Return en Line Feed (Indispensable pour Enter)
-    (Pty::ONLCR, 1), // Convertir Line Feed en CR-LF (Indispensable pour l'affichage)
-];
+        let manual_modes: Vec<(Pty, u32)> = vec![
+            (Pty::ICRNL, 1), // Convertir Carriage Return en Line Feed (Indispensable pour Enter)
+            (Pty::ONLCR, 1), // Convertir Line Feed en CR-LF (Indispensable pour l'affichage)
+        ];
 
         let shell_task = Task::perform(
-    async move {
-        // 1. On ouvre la session et on libère le lock IMMÉDIATEMENT
-        let mut ch = {
-            let mut h_lock = handle.lock().await;
-            h_lock.channel_open_session().await.ok()?
-        }; // Le verrou h_lock est relâché ici !
+            async move {
+                // 1. On ouvre la session et on libère le lock IMMÉDIATEMENT
+                let mut ch = {
+                    let mut h_lock = handle.lock().await;
+                    h_lock.channel_open_session().await.ok()?
+                }; // Le verrou h_lock est relâché ici !
 
-        // 2. Maintenant on peut configurer le canal sans bloquer le reste du client
-        // On remplace les let _ par des vérifications réelles
-        if let Err(e) = ch.request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes).await {
-            eprintln!("Erreur PTY: {:?}", e);
-            return None;
-        }
+                // 2. Maintenant on peut configurer le canal sans bloquer le reste du client
+                // On remplace les let _ par des vérifications réelles
+                if let Err(e) = ch
+                    .request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes)
+                    .await
+                {
+                    eprintln!("Erreur PTY: {:?}", e);
+                    return None;
+                }
 
-        // 2. Ouverture Shell
-        ch.request_shell(true).await.ok()?;
+                // 2. Ouverture Shell
+                ch.request_shell(true).await.ok()?;
 
-        // 3. LE TRUC MAGIQUE : On envoie un saut de ligne tout de suite
-        // pour forcer le Shell à afficher le prompt initial.
+                // 3. LE TRUC MAGIQUE : On envoie un saut de ligne tout de suite
+                // pour forcer le Shell à afficher le prompt initial.
 
-let initial_data: &[u8] = &[13]; 
-ch.data(initial_data).await.ok();
+                let initial_data: &[u8] = &[13];
+                ch.data(initial_data).await.ok();
 
-
-
-        println!("SYSTÈME: Shell interactif ouvert avec succès.");
-        Some(Arc::new(Mutex::new(ch)))
-    },
-    |ch| ch.map(Message::SetChannel).unwrap_or(Message::DoNothing),
-);
+                println!("SYSTÈME: Shell interactif ouvert avec succès.");
+                Some(Arc::new(Mutex::new(ch)))
+            },
+            |ch| ch.map(Message::SetChannel).unwrap_or(Message::DoNothing),
+        );
 
         Task::batch(vec![
             win_task.discard(),
@@ -300,7 +307,7 @@ ch.data(initial_data).await.ok();
             | Message::ProfileSelected(_)
             | Message::SectionChanged(_)
             | Message::ThemeChanged(_)
-            | Message::TabPressed => crate::ui::views::login::update(self, message),
+            | Message::TabPressed => login::update(self, message),
             Message::QuitRequested => {
                 std::process::exit(0);
             }
@@ -310,8 +317,9 @@ ch.data(initial_data).await.ok();
             | Message::HistoryPrev
             | Message::HistoryNext
             | Message::SetChannel(_)
-            | Message::KeyPressed(_,_) => terminal::update(self, message),
-            | Message::ThemeSelected(_) => terminal::update(self, message),
+            | Message::KeyPressed(_, _) => terminal::update(self, message),
+            //| Message::KeyboardEvent(event) => terminal::update(self, Message::KeyboardEvent(event)),
+            Message::ThemeSelected(_) => terminal::update(self, message),
 
             // Gestion globale (Fenêtres)
             Message::TerminalWindowOpened(id) => {
@@ -325,6 +333,63 @@ ch.data(initial_data).await.ok();
                 Task::none()
             }
             Message::WindowClosed(id) => self.handle_window_closed(id),
+            
+            Message::KeyboardEvent(event) => {
+    // On extrait l'événement clavier une seule fois pour tout le bloc
+    if let iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+        key,
+        modifiers,
+        text,
+        ..
+    }) = event
+    {
+        // --- CAS 1 : MODE LOGIN (Navigation manuelle) ---
+        if self.active_channel.is_none() {
+            if key == iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab) {
+                // Détermination du prochain ID
+                let next_id = match self.focused_id {
+                    ID_PROFILE => ID_GROUP, // On reste sur le champ du profil pour éviter de perdre les données déjà saisies
+                    ID_GROUP   => ID_IP,   // Idem pour le groupe
+                    ID_IP   => ID_PORT,
+                    ID_PORT => ID_USER,
+                    ID_USER => ID_PASS,
+                    _       => ID_PROFILE,
+                };
+
+                println!("TAB détecté au login. Focus : {} -> {}", self.focused_id, next_id);
+                
+                self.focused_id = next_id;
+                // On retourne immédiatement la tâche de focus
+                return text_input::focus(text_input::Id::new(next_id));
+            }
+            // Si on est au login mais que ce n'est pas un TAB, on ne fait rien
+            return Task::none();
+        }
+
+        // --- CAS 2 : MODE CONNECTÉ (SSH) ---
+        // On arrive ici seulement si active_channel.is_some()
+        if let Some(channel_arc) = &self.active_channel {
+            let bytes = self.map_event_to_bytes(
+                key.clone(),
+                modifiers,
+                text.map(|t| t.to_string()),
+            );
+
+            if let Some(b) = bytes {
+                let arc = channel_arc.clone();
+                return Task::perform(
+                    async move {
+                        let mut ch = arc.lock().await;
+                        let _ = ch.data(&b[..]).await;
+                    },
+                    |_| Message::DoNothing,
+                );
+            }
+        }
+    }
+    
+    Task::none()
+}
 
             _ => Task::none(),
         }
@@ -407,6 +472,37 @@ ch.data(initial_data).await.ok();
                 );
                 Vec::new()
             }
+        }
+    }
+
+    fn map_event_to_bytes(&self,key: Key, mods: Modifiers, text: Option<String>) -> Option<Vec<u8>> {
+        // Priorité 1 : Les raccourcis CTRL
+        if mods.control() {
+            if let Key::Character(ref c) = key {
+                let b = c.as_bytes();
+                if !b.is_empty() { return Some(vec![b[0] & 0x1f]); }
+            }
+        }
+
+        // Priorité 2 : Le texte normal (Lettres, chiffres, symboles)
+        if let Some(t) = text {
+            let c = t.chars().next()?;
+            if !c.is_control() && c != ' ' {
+                return Some(t.as_bytes().to_vec());
+            }
+        }
+
+        // Priorité 3 : Touches spéciales
+        match key {
+            Key::Named(Named::Enter) => Some(b"\r\n".to_vec()),
+            Key::Named(Named::Tab) => Some(b"\t".to_vec()),
+            Key::Named(Named::Backspace) => Some(b"\x7f".to_vec()),
+            Key::Named(Named::Space) => Some(b" ".to_vec()),
+            Key::Named(Named::ArrowUp) => Some(b"\x1b[A".to_vec()),
+            Key::Named(Named::ArrowDown) => Some(b"\x1b[B".to_vec()),
+            Key::Named(Named::ArrowRight) => Some(b"\x1b[C".to_vec()),
+            Key::Named(Named::ArrowLeft) => Some(b"\x1b[D".to_vec()),
+            _ => None,
         }
     }
 }

@@ -1,13 +1,18 @@
 mod ssh;
 mod ui;
 
-use iced::{keyboard, window};
+use iced::{Task, keyboard, widget::text_input, window};
 use ui::{Message, MyApp};
+
+use crate::ui::ID_PROFILE;
 
 pub fn main() -> iced::Result {
     // 1. Configuration du daemon Iced
     iced::daemon("RustTy", MyApp::update, MyApp::view)
-        .subscription(|_| {
+    //En écrivant |_|, 
+    //tu disais à Rust : "Reçois cet argument, mais je m'en fiche, je ne vais pas l'appeler à l'intérieur de mon code".
+    // on veut l'utiliser donc |app|
+        .subscription(|app| {
             // Gestion des événements de fenêtre (Ouverture/Fermeture)
             let window_events = window::events().map(|(id, event)| {
                 match event {
@@ -19,15 +24,29 @@ pub fn main() -> iced::Result {
                 }
             });
 
+            let keyboard_events = iced::event::listen_with(|event, status, _id| {
+    match status {
+        // Si un widget (comme un TextInput) a déjà utilisé l'événement,
+        // on ne fait rien pour ne pas interférer.
+        iced::event::Status::Captured => None,
+        
+        // Si l'événement est libre (Ignored), on l'envoie à l'update
+        iced::event::Status::Ignored => Some(Message::KeyboardEvent(event)),
+    }
+});
+
+            //let is_connected = app.active_channel.is_some(); // On vérifie la connexion
             // Gestion des événements clavier
-            let keyboard_events = iced::event::listen().map(|event| {
-                match event {
+            //let keyboard_events = iced::event::listen().map(|event| {
+               /* match event {
                     iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
                         key,
                         modifiers,
                         text,
                         ..
                     }) => {
+
+            
                         // --- 1. GESTION DES CARACTÈRES ALPHANUMÉRIQUES ---
                         if let Some(t) = text {
                             // On n'envoie le texte que si CTRL n'est pas enfoncé 
@@ -83,8 +102,13 @@ pub fn main() -> iced::Result {
                         Message::DoNothing
                     }
                     _ => Message::DoNothing,
-                }
-            });
+                } */
+
+               // On renvoie un nouveau type de message qui contient l'événement brut
+                //Message::KeyboardEvent(event)
+
+                
+           // });
 
             // Fusion des abonnements
             iced::Subscription::batch(vec![window_events, keyboard_events])
@@ -96,6 +120,11 @@ pub fn main() -> iced::Result {
                 ..Default::default()
             });
 
-            (MyApp::new(id), task.discard())
+            (MyApp::new(id), 
+            Task::batch(vec![
+            task.discard(),
+                // C'est ici que l'on force le curseur sur le champ IP au lancement
+                text_input::focus(text_input::Id::new(ID_PROFILE))
+            ]))
         })
 }

@@ -22,6 +22,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             render_input_with_label(
                 "Nom du profil",
                 &app.current_profile.name,
+                text_input::Id::new("profile_input"),
                 colors,
                 None,
                 false,
@@ -31,6 +32,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             render_input_with_label(
                 "Groupe",
                 &app.current_profile.group,
+                text_input::Id::new("group_input"),
                 colors,
                 None,
                 false,
@@ -43,6 +45,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             render_input_with_label(
                 "Adresse IP",
                 &app.current_profile.ip,
+                text_input::Id::new("ip_input"),
                 colors,
                 None,
                 false,
@@ -52,6 +55,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             render_input_with_label(
                 "Port",
                 &app.current_profile.port,
+                text_input::Id::new("port_input"),
                 colors,
                 None,
                 false,
@@ -64,6 +68,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             render_input_with_label(
                 "Nom d'utilisateur",
                 &app.current_profile.username,
+                text_input::Id::new("user_input"),
                 colors,
                 None,
                 false,
@@ -73,6 +78,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             render_input_with_label(
                 "Mot de passe",
                 &app.password,
+                text_input::Id::new("pass_input"),
                 colors,
                 Some("⚠️ Non enregistré dans le profil pour votre sécurité"),
                 true,
@@ -89,6 +95,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
 fn render_input_with_label<'a>(
     label: &'a str,
     value: &'a str,
+    id: text_input::Id, // On peut utiliser l'ID pour associer le label à l'input si besoin
     colors: TerminalColors, // On va s'en servir !
     helper_text: Option<&'a str>,
     is_secure: bool,
@@ -103,6 +110,7 @@ fn render_input_with_label<'a>(
         }),
         // 2. Input
         text_input(label, value)
+            .id(id)
             .on_input(msg)
             .padding(10)
             .secure(is_secure)
