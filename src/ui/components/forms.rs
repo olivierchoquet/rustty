@@ -1,5 +1,6 @@
+use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage};
 use crate::ui::theme::{self, ThemeChoice};
-use crate::ui::{Message, MyApp, theme::TerminalColors};
+use crate::ui::{ MyApp, theme::TerminalColors};
 use iced::font::Weight;
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Alignment, Color, Element, Font, Length, Theme};
@@ -26,7 +27,9 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                Message::InputNewProfileName,
+                //Message::Profile(ProfileMessage::InputName),
+                // On crée une closure qui prend la chaîne 's' et l'emballe
+                |s| Message::Profile(ProfileMessage::InputName(s)),
                 None,
             ),
             render_input_with_label(
@@ -36,7 +39,8 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                Message::InputNewProfileGroup,
+                //Message::InputNewProfileGroup,
+                |s| Message::Profile(ProfileMessage::InputGroup(s)),
                 None
             ),
         ]
@@ -49,7 +53,8 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                Message::InputIP,
+                //Message::InputIP,
+                |s| Message::Login(LoginMessage::InputIP(s)),
                 None
             ),
             render_input_with_label(
@@ -59,7 +64,8 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                Message::InputPort,
+                //Message::InputPort,
+                |s| Message::Login(LoginMessage::InputPort(s)),
                 None
             ),
         ]
@@ -72,7 +78,8 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                Message::InputUsername,
+                //Message::InputUsername,
+                |s| Message::Login(LoginMessage::InputUsername(s)),
                 None,
             ),
             render_input_with_label(
@@ -82,8 +89,10 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 Some("⚠️ Non enregistré dans le profil pour votre sécurité"),
                 true,
-                Message::InputPass,
-                Some(Message::ButtonConnection)
+                //Message::InputPass,
+                |s| Message::Login(LoginMessage::InputPass(s)),
+                //Some(Message::ButtonConnection)
+                Some(Message::Login(LoginMessage::Submit))
             ),
         ]
         .spacing(10),
@@ -201,7 +210,7 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
             .width(Length::Fill)
             .center_x(Length::Fill),
         )
-        .on_press(Message::ThemeChanged(*theme))
+        .on_press(Message::Config(ConfigMessage::ThemeChanged(*theme)))
         .style(move |_, status| {
             let mut s = theme::button_style(colors, status, theme::ButtonVariant::Secondary);
             if is_selected {

@@ -1,4 +1,4 @@
-use crate::ui::{Message, theme::TerminalColors};
+use crate::messages::{Message, SshMessage};
 use async_trait::async_trait;
 use iced::{Color, futures::channel::mpsc};
 use russh::{
@@ -29,7 +29,7 @@ impl client::Handler for MyHandler {
     ) -> Result<(), Self::Error> {
         // On envoie les données brutes à l'UI
         // L'UI devra décider comment les interpréter (soit texte brut, soit codes ANSI)
-        let _ = self.sender.try_send(Message::SshData(data.to_vec()));
+        let _ = self.sender.try_send(Message::Ssh(SshMessage::DataReceived(data.to_vec())));
         Ok(())
     }
 }

@@ -1,10 +1,11 @@
 mod ssh;
 mod ui;
+pub mod messages;
 
 use iced::{Task, keyboard, widget::text_input, window};
-use ui::{Message, MyApp};
+use ui::{MyApp};
 
-use crate::ui::ID_PROFILE;
+use crate::{messages::Message, ui::constants::*};
 
 pub fn main() -> iced::Result {
     // 1. Configuration du daemon Iced
@@ -24,14 +25,14 @@ pub fn main() -> iced::Result {
                 }
             });
 
-            let keyboard_events = iced::event::listen_with(|event, status, _id| {
+            let events = iced::event::listen_with(|event, status, _id| {
     match status {
         // Si un widget (comme un TextInput) a déjà utilisé l'événement,
         // on ne fait rien pour ne pas interférer.
         iced::event::Status::Captured => None,
         
         // Si l'événement est libre (Ignored), on l'envoie à l'update
-        iced::event::Status::Ignored => Some(Message::KeyboardEvent(event)),
+        iced::event::Status::Ignored => Some(Message::Event(event)),
     }
 });
 
@@ -111,7 +112,7 @@ pub fn main() -> iced::Result {
            // });
 
             // Fusion des abonnements
-            iced::Subscription::batch(vec![window_events, keyboard_events])
+            iced::Subscription::batch(vec![window_events, events])
         })
         .run_with(|| {
             // Initialisation de la fenêtre principale (Login)

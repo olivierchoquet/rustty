@@ -1,6 +1,7 @@
 use iced::widget::image;
 use iced::{Element, Length};
-use crate::ui::Message;
+
+use crate::messages::Message;
 
 pub fn logo() -> Element<'static, Message> {
     // On charge l'image à partir du chemin relatif

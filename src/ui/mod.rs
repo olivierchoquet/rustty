@@ -10,8 +10,10 @@ use uuid::Uuid;
 use std::sync::Arc;
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
+use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage, SshMessage};
 // Mes modules internes
 use crate::ssh::{MyHandler, SshChannel};
+use crate::ui::constants::*;
 use crate::ui::theme::ThemeChoice;
 use crate::ui::views::login;
 use vt100;
@@ -20,62 +22,13 @@ pub mod components;
 pub mod terminal;
 pub mod theme;
 pub mod views;
+pub mod constants;
 
 // Identifiant unique pour le widget scrollable du terminal
 pub const SCROLLABLE_ID: &str = "terminal_scroll";
 // Nombre maximum de lignes à conserver dans le terminal (tampon)
 // usize est le type pour les tailles et indices non signés qui s'adapte à l'architecture (32 ou 64 bits)
 const MAX_TERMINAL_LINES: usize = 1000;
-
-// Identifiants pour le focus - touche tabulation
-pub const ID_PROFILE: &str = "profile_input";
-pub const ID_GROUP: &str = "group_input";
-pub const ID_IP: &str = "ip_input";
-pub const ID_PORT: &str = "port_input";
-pub const ID_USER: &str = "user_input";
-pub const ID_PASS: &str = "pass_input";
-
-// --- DÉFINITION DES MESSAGES ET DE L'APPLICATION ---
-#[derive(Clone)]
-pub enum Message {
-    InputIP(String),
-    InputPort(String),
-    InputUsername(String),
-    InputPass(String),
-    ButtonConnection,
-    SshConnected(Result<Arc<Mutex<russh::client::Handle<MyHandler>>>, String>),
-    TerminalWindowOpened(window::Id),
-    SetChannel(Arc<Mutex<SshChannel>>),
-    SshData(Vec<u8>),           // RECEPTION (du serveur vers l'UI)
-    SendSshRaw(Vec<u8>),        // ENVOI (de l'UI vers le serveur)
-    KeyboardEvent(iced::Event), // Nouveaux messages pour les événements clavier
-    KeyPressed(iced::keyboard::Key, iced::keyboard::Modifiers),
-    DoNothing,
-    WindowClosed(window::Id),
-    HistoryPrev,
-    HistoryNext,
-    TabPressed,
-    WindowOpened(window::Id),
-    ThemeSelected(ThemeChoice),
-    ProfileSelected(uuid::Uuid),
-    SaveProfile,
-    DeleteProfile,
-    NewProfile,
-    InputNewProfileName(String),
-    InputNewProfileGroup(String),
-    SearchChanged(String),
-    SectionChanged(EditSection),
-    ThemeChanged(ThemeChoice),
-    QuitRequested,
-    RawKey(Vec<u8>),
-}
-
-// Implémentation de Debug pour Message pour faciliter le débogage
-impl std::fmt::Debug for Message {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("SshMsg")
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub struct Profile {
@@ -177,19 +130,17 @@ impl MyApp {
                 {
                     println!("Authentification réussie !");
                     let _ = output
-                        .send(Message::SshConnected(Ok(Arc::new(Mutex::new(handle)))))
+                        .send(Message::Ssh(SshMessage::Connected(Ok(Arc::new(Mutex::new(handle))))))
                         .await;
                 } else {
                     println!("Échec de l'authentification.");
                     let _ = output
-                        .send(Message::SshConnected(
-                            Err("Échec d'authentification".into()),
-                        ))
+                        .send(Message::Ssh(SshMessage::Connected(Err("Échec d'authentification".into()))))
                         .await;
                 }
             } else {
                 let _ = output
-                    .send(Message::SshConnected(Err("Serveur introuvable".into())))
+                    .send(Message::Ssh(SshMessage::Connected(Err("Serveur introuvable".into()))))
                     .await;
             }
         }))
@@ -202,11 +153,6 @@ impl MyApp {
             ..Default::default()
         });
 
-        // On crée le vecteur de configuration attendu par request_pty
-
-        //let mut modes = russh::terminal_modes::TerminalModes::default();
-        //modes.set(russh::terminal_modes::TerminalMode::ICRNL, 1); // Transforme CR en NL en entrée
-        //modes.set(russh::terminal_modes::TerminalMode::ONLCR, 1); // Transforme NL en CR-NL en sortie
 
         // Dans ton code de connexion (pas dans le handler)
         let manual_modes: Vec<(Pty, u32)> = vec![
@@ -244,12 +190,13 @@ impl MyApp {
                 println!("SYSTÈME: Shell interactif ouvert avec succès.");
                 Some(Arc::new(Mutex::new(ch)))
             },
-            |ch| ch.map(Message::SetChannel).unwrap_or(Message::DoNothing),
+            |ch|ch.map(|channel| Message::Ssh(SshMessage::SetChannel(channel)))
+       .unwrap_or(Message::DoNothing),
         );
 
         Task::batch(vec![
             win_task.discard(),
-            Task::done(Message::TerminalWindowOpened(id)),
+            Task::done(Message::Ssh(SshMessage::TerminalWindowOpened(id))),
             shell_task,
         ])
     }
@@ -281,9 +228,9 @@ impl MyApp {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             // Actions de haut niveau (isolées dans des méthodes)
-            Message::ButtonConnection => self.perform_ssh_connection(),
-            Message::SshConnected(Ok(handle)) => self.open_terminal(handle),
-            Message::SshConnected(Err(e)) => {
+            Message::Login(LoginMessage::Submit) => self.perform_ssh_connection(),
+            Message::Ssh(SshMessage::Connected(Ok(handle))) => self.open_terminal(handle),
+            Message::Ssh(SshMessage::Connected(Err(e))) => {
                 let error_msg = format!("\r\nErreur de connexion: {}\r\n", e);
 
                 // On "trompe" le parser en lui faisant croire que le serveur
@@ -294,35 +241,36 @@ impl MyApp {
             }
 
             // Délégations aux modules
-            Message::InputIP(_)
-            | Message::InputPort(_)
-            | Message::InputUsername(_)
-            | Message::InputPass(_)
-            | Message::SaveProfile
-            | Message::DeleteProfile
-            | Message::NewProfile
-            | Message::InputNewProfileName(_)
-            | Message::InputNewProfileGroup(_)
-            | Message::SearchChanged(_)
-            | Message::ProfileSelected(_)
-            | Message::SectionChanged(_)
-            | Message::ThemeChanged(_)
-            | Message::TabPressed => login::update(self, message),
+            Message::Login(LoginMessage::InputIP(_))
+            | Message::Login(LoginMessage::InputPort(_))
+            | Message::Login(LoginMessage::InputUsername(_))
+            | Message::Login(LoginMessage::InputPass(_))
+            | Message::Profile(ProfileMessage::Save)
+            | Message::Profile(ProfileMessage::Delete)
+            | Message::Profile(ProfileMessage::New)
+            | Message::Profile(ProfileMessage::InputName(_))
+            | Message::Profile(ProfileMessage::InputGroup(_))
+            | Message::Profile(ProfileMessage::SearchChanged(_))
+            | Message::Profile(ProfileMessage::Selected(_))
+            | Message::Config(ConfigMessage::SectionChanged(_))
+            | Message::Config(ConfigMessage::ThemeChanged(_)) => login::update(self, message),
+           // | Message::TabPressed => login::update(self, message),
             Message::QuitRequested => {
                 std::process::exit(0);
             }
 
-            Message::SshData(_)
-            | Message::SendSshRaw(_)
-            | Message::HistoryPrev
-            | Message::HistoryNext
-            | Message::SetChannel(_)
-            | Message::KeyPressed(_, _) => terminal::update(self, message),
+            Message::Ssh(SshMessage::DataReceived(_))
+            | Message::Ssh(SshMessage::SendData(_))
+            //| Message::HistoryPrev
+            //| Message::HistoryNext
+            | Message::Ssh(SshMessage::SetChannel(_))
+             => terminal::update(self, message),
+            //| Message::KeyPressed(_, _) => terminal::update(self, message),
             //| Message::KeyboardEvent(event) => terminal::update(self, Message::KeyboardEvent(event)),
-            Message::ThemeSelected(_) => terminal::update(self, message),
+            //Message::Config(ConfigMessage::ThemeChanged((_))) => terminal::update(self, message),
 
             // Gestion globale (Fenêtres)
-            Message::TerminalWindowOpened(id) => {
+            Message::Ssh(SshMessage::TerminalWindowOpened(id)) => {
                 self.terminal_window_id = Some(id);
                 Task::none()
             }
@@ -334,7 +282,7 @@ impl MyApp {
             }
             Message::WindowClosed(id) => self.handle_window_closed(id),
             
-            Message::KeyboardEvent(event) => {
+            Message::Event(event) => {
     // On extrait l'événement clavier une seule fois pour tout le bloc
     if let iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
         key,

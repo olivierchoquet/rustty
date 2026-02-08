@@ -1,6 +1,6 @@
 use iced::Element;
 use iced::widget::column;
-use crate::ui::{Message, MyApp, components::{actions, forms}, theme::TerminalColors};
+use crate::{messages::Message, ui::{MyApp, components::{actions, forms}, theme::TerminalColors}};
 
 pub fn render<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     column![

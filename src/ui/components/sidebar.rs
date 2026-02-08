@@ -1,7 +1,8 @@
 use iced::widget::{button, column, container, text, vertical_space};
 use iced::{Alignment, Border, Element, Length};
+use crate::messages::{ConfigMessage, Message};
 use crate::ui::components::brand;
-use crate::ui::{Message, EditSection, theme::{self, TerminalColors}};
+use crate::ui::{ EditSection, theme::{self, TerminalColors}};
 
 pub fn render<'a>(active_section: EditSection, colors: TerminalColors) -> Element<'a, Message> {
     container(
@@ -46,7 +47,7 @@ fn nav_button<'a>(
     let is_active = section == active;
 
     button(text(label).width(Length::Fill).center())
-        .on_press(Message::SectionChanged(section))
+        .on_press(Message::Config(ConfigMessage::SectionChanged(section)))
         .padding(10)
         .style(move |_, status| {
             // 1. On récupère le style de base

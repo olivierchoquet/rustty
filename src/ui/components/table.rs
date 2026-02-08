@@ -1,5 +1,6 @@
+use crate::messages::{Message, ProfileMessage};
 use crate::ui::theme;
-use crate::ui::{Message, MyApp, theme::TerminalColors};
+use crate::ui::{MyApp, theme::TerminalColors};
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
 use iced::{Element, Font, Length, font};
 
@@ -7,7 +8,7 @@ pub fn header<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message
     column![
         // Barre de recherche
         text_input("🔍 Recherche rapide sur nom, groupe, ip, utilisateur", &app.search_query)
-            .on_input(Message::SearchChanged)
+            .on_input(|v| Message::Profile(ProfileMessage::SearchChanged(v)))
             .padding(10)
             .style(move |theme: &iced::Theme, status| {
                 theme::input_style(colors, status)
@@ -74,7 +75,7 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
                     .padding(8),
                 )
                 .width(Length::Fill)
-                .on_press(Message::ProfileSelected(profile.id))
+                .on_press(Message::Profile(ProfileMessage::Selected(profile.id)))
                 .style(move |_, status| {
                     let mut st = theme::button_style(colors, status,theme::ButtonVariant::Secondary);
                     if is_selected {

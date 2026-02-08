@@ -1,5 +1,6 @@
+use crate::messages::{LoginMessage, Message, ProfileMessage};
 use crate::ui::theme;
-use crate::ui::{Message, theme::TerminalColors};
+use crate::ui::{theme::TerminalColors};
 use iced::widget::{button, container, row, text};
 use iced::{Alignment, Element, Length};
 
@@ -15,21 +16,21 @@ pub fn buttons_form<'a>(colors: TerminalColors, is_editing: bool) -> Element<'a,
 
     let content = row![
         button("Nouveau")
-            .on_press(Message::NewProfile)
+            .on_press(Message::Profile(ProfileMessage::New))
             .style(move |_, s| theme::button_style(c1, s,theme::ButtonVariant::Secondary)), 
             
         button(text(texte_bouton).center())
-            .on_press(Message::SaveProfile)
+            .on_press(Message::Profile(ProfileMessage::Save))
             .padding(10)
             .style(move |_, s| theme::button_style(c1, s,theme::ButtonVariant::Secondary)),
 
         button(text("Supprimer").center())
-            .on_press(Message::DeleteProfile)
+            .on_press(Message::Profile(ProfileMessage::Delete))
             .padding(10)
             .style(move |_, s| theme::button_style(c2, s,theme::ButtonVariant::Secondary)),
 
         button(text("Démarrer SSH").center())
-            .on_press(Message::ButtonConnection)
+            .on_press(Message::Login(LoginMessage::Submit))
             .padding(10)
             .style(move |_, s| theme::button_style(c3, s,theme::ButtonVariant::Primary)),
 

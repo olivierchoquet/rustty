@@ -4,16 +4,16 @@ use iced::{
     widget::{column, container, horizontal_rule, row, text, text_input, vertical_space},
 };
 
-use crate::ui::{
-    EditSection, ID_PASS, ID_PORT, ID_USER, Message, MyApp, Profile,
-    components::{
+use crate::{messages::{ConfigMessage, LoginMessage, Message, ProfileMessage}, ui::{
+    EditSection,  MyApp, Profile, components::{
         actions,
         forms::{general_form, theme_form},
         sidebar,
         table::{content, header},
-    },
-    theme,
-};
+    }, theme
+}};
+
+//use crate::ui::constants::*;
 
 // On dit juste à Rust que les fichiers à côté existent
 pub mod auth;
@@ -104,24 +104,12 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
 
 pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
     match message {
-        Message::InputIP(ip) => app.current_profile.ip = ip,
-        Message::InputPort(port) => app.current_profile.port = port,
-        Message::InputUsername(u) => app.current_profile.username = u,
-        Message::InputPass(p) => app.password = p,
-        Message::TabPressed => {
-            println!("DEBUG: Tab Pressed - Current focus index before: {}", app.focus_index);
-            // Gérer la navigation par Tab entre les champs de saisie
-            app.focus_index = (app.focus_index + 1) % 4;
-            let target_id = match app.focus_index {
-                0 => crate::ui::ID_IP,
-                1 => ID_PORT,
-                2 => ID_USER,
-                3 => ID_PASS,
-                _ => crate::ui::ID_IP,
-            };
-            return text_input::focus(text_input::Id::new(target_id));
-        }
-        Message::ProfileSelected(id) => {
+        Message::Login(LoginMessage::InputIP(ip)) => app.current_profile.ip = ip,
+        Message::Login(LoginMessage::InputPort(port)) => app.current_profile.port = port,
+        Message::Login(LoginMessage::InputUsername(u)) => app.current_profile.username = u,
+        Message::Login(LoginMessage::InputPass(p)) => app.password = p,
+    
+        Message::Profile(ProfileMessage::Selected(id)) => {
             // 1. On cherche le profil dans notre liste grâce à l'ID
             if let Some(profile_trouve) = app.profiles.iter().find(|p| p.id == id) {
                 // 2. On marque cet ID comme étant celui sélectionné (pour le surlignage du tableau)
@@ -137,16 +125,16 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
                 );
             }
         }
-        Message::InputNewProfileName(name) => {
+        Message::Profile(ProfileMessage::InputName(name)) => {
             app.current_profile.name = name;
         }
-        Message::InputNewProfileGroup(group) => {
+        Message::Profile(ProfileMessage::InputGroup(group)) => {
             app.current_profile.group = group;
         }
-        Message::SearchChanged(query) => {
+        Message::Profile(ProfileMessage::SearchChanged(query)) => {
             app.search_query = query;
         }
-        Message::SaveProfile => {
+        Message::Profile(ProfileMessage::Save) => {
             // 1. On vérifie les champs obligatoires
             if !app.current_profile.ip.is_empty() && !app.current_profile.name.is_empty() {
                 // On gère le groupe par défaut
@@ -190,13 +178,13 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
             }
         }
 
-        Message::NewProfile => {
+        Message::Profile(ProfileMessage::New) => {
             app.selected_profile_id = None; // On sort du mode édition
             app.current_profile = Profile::default(); // On vide les champs (formulaire vierge)
             println!("DEBUG: Formulaire réinitialisé pour un nouveau profil");
         }
 
-        Message::DeleteProfile => {
+        Message::Profile(ProfileMessage::Delete) => {
             if let Some(selected_profile_id) = &app.selected_profile_id {
                 app.profiles.retain(|p| p.id != *selected_profile_id);
                 app.selected_profile_id = None;
@@ -206,12 +194,12 @@ pub fn update(app: &mut MyApp, message: Message) -> Task<Message> {
                 app.save_profiles(); // On écrit sur le disque après la suppression
             }
         }
-        Message::SectionChanged(section) => {
+        Message::Config(ConfigMessage::SectionChanged(section)) => {
             println!("Changement de section vers : {:?}", section);
             app.active_section = section;
             // Iced 0.13 redessine automatiquement dès que l'état change
         }
-        Message::ThemeChanged(new_theme) => {
+        Message::Config(ConfigMessage::ThemeChanged(new_theme)) => {
             app.current_profile.theme = new_theme;
             // Optionnel : println!("Thème appliqué : {:?}", new_theme);
 
