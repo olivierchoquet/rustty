@@ -15,14 +15,20 @@ use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage, SshM
 use crate::ssh::{MyHandler, SshChannel};
 use crate::ui::constants::*;
 use crate::ui::theme::ThemeChoice;
-use crate::ui::views::login;
+//use crate::ui::views::login;
 use vt100;
 
-pub mod components;
 pub mod terminal;
 pub mod theme;
 pub mod views;
 pub mod constants;
+pub mod components {
+    pub mod forms;
+    pub mod sidebar;
+    pub mod table;
+    pub mod actions;
+    pub mod brand;
+}
 
 // Identifiant unique pour le widget scrollable du terminal
 pub const SCROLLABLE_ID: &str = "terminal_scroll";
@@ -253,7 +259,8 @@ impl MyApp {
             | Message::Profile(ProfileMessage::SearchChanged(_))
             | Message::Profile(ProfileMessage::Selected(_))
             | Message::Config(ConfigMessage::SectionChanged(_))
-            | Message::Config(ConfigMessage::ThemeChanged(_)) => login::update(self, message),
+          //  | Message::Config(ConfigMessage::ThemeChanged(_)) => login::update(self, message),
+          | Message::Config(ConfigMessage::ThemeChanged(_)) => views::update(self, message),
            // | Message::TabPressed => login::update(self, message),
             Message::QuitRequested => {
                 std::process::exit(0);
@@ -352,7 +359,7 @@ impl MyApp {
         } else {
             // On délègue le dessin au module login
             //login::view(self)
-            crate::ui::views::login::render(self)
+            crate::ui::views::render(self)
         }
     }
 

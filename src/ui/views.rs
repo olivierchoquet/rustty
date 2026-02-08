@@ -4,21 +4,11 @@ use iced::{
     widget::{column, container, horizontal_rule, row, text, text_input, vertical_space},
 };
 
-use crate::{messages::{ConfigMessage, LoginMessage, Message, ProfileMessage}, ui::{
-    EditSection,  MyApp, Profile, components::{
-        actions,
-        forms::{general_form, theme_form},
-        sidebar,
-        table::{content, header},
-    }, theme
-}};
+use crate::{messages::{ConfigMessage, LoginMessage, Message, ProfileMessage}, ui::{EditSection, MyApp, Profile, components::{forms::{general_form, theme_form}, table::{content, header}}, theme}};
+use crate::ui::components::{actions, sidebar};
 
 //use crate::ui::constants::*;
 
-// On dit juste à Rust que les fichiers à côté existent
-pub mod auth;
-pub mod general;
-pub mod themes;
 
 pub fn render(app: &MyApp) -> Element<'_, Message> {
     let colors = app.current_profile.theme.get_colors();
