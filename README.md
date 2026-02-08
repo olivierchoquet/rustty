@@ -56,3 +56,17 @@ src/
 └── ssh/             # Ta logique de connexion (Russh/Tokio)
     ├── mod.rs
     └── client.rs
+
+
+
+src/
+├── main.rs         <-- Point d'entrée, déclare "mod ui;" et "mod ssh;"
+├── messages.rs     <-- Tes Enums (Message, SshMessage, etc.)
+├── ssh.rs          <-- Ta logique réseau/russh
+├── ui.rs           <-- Le "cerveau" de l'UI (MyApp, update, view)
+└── ui/             <-- Dossier privé de l'UI
+    ├── constants.rs
+    ├── terminal.rs
+    ├── theme.rs
+    ├── views.rs    <-- Aiguillage vers les différentes fenêtres
+    └── components/ <-- Dossier contenant tes briques (forms, buttons...)
