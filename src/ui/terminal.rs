@@ -12,7 +12,7 @@ use iced::widget::{button, column, container, pick_list, row, scrollable, text, 
 use iced::{Alignment, Element, Length, Task};
 use vt100;
 
-pub fn view(app: &MyApp) -> Element<'_, Message> {
+pub fn render(app: &MyApp) -> Element<'_, Message> {
     let colors = app.current_profile.theme.get_colors();
     let screen = app.parser.screen();
     let (rows, cols) = screen.size();
