@@ -2,8 +2,9 @@
 use iced::futures::SinkExt;
 use iced::keyboard::key::Named;
 use iced::keyboard::{Key, Modifiers};
-use iced::widget::text_input;
+use iced::widget::{scrollable, text_input};
 use iced::{Element, Task, window};
+use russh::server::Msg;
 use russh::{Pty, client};
 use uuid::Uuid;
 // Importation des types pour la gestion de la concurrence
@@ -91,112 +92,27 @@ impl MyApp {
 
 
 // router message
-    pub fn update(&mut self, message: Message) -> Task<Message> {
-        match message {
-
-            Message::Ssh(SshMessage::Connected(Ok(handle))) => 
-            {
-                SshService::open_shell(handle)
-            },
-            Message::Ssh(SshMessage::Connected(Err(e))) => {
-                let error_msg = format!("\r\nErreur de connexion: {}\r\n", e);
-
-                // On "trompe" le parser en lui faisant croire que le serveur
-                // a envoyé ce texte. On utilise \r\n pour être sûr d'aller à la ligne.
-                self.parser.process(error_msg.as_bytes());
-
-                Task::none()
-            },
-            Message::Login(msg) => self.handle_login_msg(msg),
-            Message::Profile(msg)=> self.handle_profile_msg(msg),
-            Message::Config(msg) => self.handle_config_msg(msg),
-            Message::QuitRequested => {
-                std::process::exit(0);
+pub fn update(&mut self, message: Message) -> Task<Message> {
+    match message {
+        Message::Login(msg)   => self.handle_login_msg(msg),
+        Message::Profile(msg) => self.handle_profile_msg(msg),
+        Message::Config(msg)  => self.handle_config_msg(msg),
+        Message::Ssh(msg)     => self.handle_ssh_msg(msg),
+        Message::Event(event) => self.handle_keyboard_event(event), // Utilise la fonction dédiée !
+        
+        Message::QuitRequested => std::process::exit(0),
+        
+        Message::WindowOpened(id) => {
+            if Some(id) == self.login_window_id {
+                return text_input::focus(text_input::Id::new(ID_IP));
             }
-
-            Message::Ssh(SshMessage::DataReceived(_))
-            | Message::Ssh(SshMessage::SendData(_))
-            //| Message::HistoryPrev
-            //| Message::HistoryNext
-            | Message::Ssh(SshMessage::SetChannel(_))
-             => terminal::update(self, message),
-            //| Message::KeyPressed(_, _) => terminal::update(self, message),
-            //| Message::KeyboardEvent(event) => terminal::update(self, Message::KeyboardEvent(event)),
-            //Message::Config(ConfigMessage::ThemeChanged((_))) => terminal::update(self, message),
-
-            // Gestion globale (Fenêtres)
-            Message::Ssh(SshMessage::TerminalWindowOpened(id)) => {
-                self.terminal_window_id = Some(id);
-                Task::none()
-            }
-            Message::WindowOpened(id) => {
-                if Some(id) == self.login_window_id {
-                    return text_input::focus(text_input::Id::new(ID_IP));
-                }
-                Task::none()
-            }
-            Message::WindowClosed(id) => self.handle_window_closed(id),
-            
-            Message::Event(event) => {
-    // On extrait l'événement clavier une seule fois pour tout le bloc
-    if let iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
-        key,
-        modifiers,
-        text,
-        ..
-    }) = event
-    {
-        // --- CAS 1 : MODE LOGIN (Navigation manuelle) ---
-        if self.active_channel.is_none() {
-            if key == iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab) {
-                // Détermination du prochain ID
-                let next_id = match self.focused_id {
-                    ID_PROFILE => ID_GROUP, // On reste sur le champ du profil pour éviter de perdre les données déjà saisies
-                    ID_GROUP   => ID_IP,   // Idem pour le groupe
-                    ID_IP   => ID_PORT,
-                    ID_PORT => ID_USER,
-                    ID_USER => ID_PASS,
-                    _       => ID_PROFILE,
-                };
-
-                println!("TAB détecté au login. Focus : {} -> {}", self.focused_id, next_id);
-                
-                self.focused_id = next_id;
-                // On retourne immédiatement la tâche de focus
-                return text_input::focus(text_input::Id::new(next_id));
-            }
-            // Si on est au login mais que ce n'est pas un TAB, on ne fait rien
-            return Task::none();
+            Task::none()
         }
+        Message::WindowClosed(id) => self.handle_window_closed(id),
 
-        // --- CAS 2 : MODE CONNECTÉ (SSH) ---
-        // On arrive ici seulement si active_channel.is_some()
-        if let Some(channel_arc) = &self.active_channel {
-            let bytes = self.map_event_to_bytes(
-                key.clone(),
-                modifiers,
-                text.map(|t| t.to_string()),
-            );
-
-            if let Some(b) = bytes {
-                let arc = channel_arc.clone();
-                return Task::perform(
-                    async move {
-                        let mut ch = arc.lock().await;
-                        let _ = ch.data(&b[..]).await;
-                    },
-                    |_| Message::DoNothing,
-                );
-            }
-        }
+        _ => Task::none(),
     }
-    
-    Task::none()
 }
-
-            _ => Task::none(),
-        }
-    }
 
     // --- LOGIQUE VISUELLE (VIEW) ---
 
@@ -395,4 +311,117 @@ fn handle_config_msg(&mut self, msg: ConfigMessage) -> Task<Message> {
     }
     Task::none()
 }
+
+
+
+  fn handle_ssh_msg(&mut self, msg: SshMessage) -> Task<Message> {
+    match msg {
+        // 1. Déclenche l'ouverture de la fenêtre
+        SshMessage::Connected(Ok(handle)) => {
+            crate::ssh::SshService::open_shell(handle)
+        }
+        
+        // 2. LA PIÈCE MANQUANTE : Enregistre l'ID de la fenêtre ouverte
+        SshMessage::TerminalWindowOpened(id) => {
+            println!("LOG: Nouvelle fenêtre terminal détectée (ID: {:?})", id);
+            self.terminal_window_id = Some(id);
+            Task::none()
+        }
+
+        // 3. Stocke le canal pour pouvoir envoyer des touches plus tard
+        SshMessage::SetChannel(ch) => {
+            self.active_channel = Some(ch);
+            Task::none()
+        }
+
+        // 4. Réception des données (VT100)
+        SshMessage::DataReceived(raw_bytes) => {
+            self.parser.process(&raw_bytes);
+            scrollable::snap_to::<Message>(
+                scrollable::Id::new(SCROLLABLE_ID),
+                scrollable::RelativeOffset::END,
+            )
+        }
+
+        // ... reste de ton match (SendData, etc.)
+        _ => Task::none(),
+    }
 }
+
+    fn handle_keyboard_event(&mut self, event: iced::Event) -> Task<Message> {
+    if let iced::Event::Keyboard(iced::keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
+        
+        // CAS A : ON EST CONNECTÉ (Priorité absolue au SSH)
+        if let Some(channel_arc) = &self.active_channel {
+             if let Some(bytes) = map_key_to_ssh(&key, modifiers) {
+                let arc = channel_arc.clone();
+                return Task::perform(
+                    async move {
+                        let mut ch = arc.lock().await;
+                        let _ = ch.data(&bytes[..]).await;
+                    },
+                    |_| Message::DoNothing,
+                );
+            }
+            return Task::none(); // On stoppe ici si on est connecté
+        } 
+        
+        // CAS B : MODE LOGIN (Navigation)
+        if key == Key::Named(Named::Tab) {
+            let next_id = match self.focused_id {
+                ID_PROFILE => ID_GROUP,
+                ID_GROUP   => ID_IP,
+                ID_IP      => ID_PORT,
+                ID_PORT    => ID_USER,
+                ID_USER    => ID_PASS,
+                _          => ID_PROFILE,
+            };
+            self.focused_id = next_id;
+            return text_input::focus(text_input::Id::new(next_id));
+        }
+    }
+    Task::none()
+}
+
+}
+
+// pure function no self needed
+fn map_key_to_ssh(key: &Key, mods: Modifiers) -> Option<Vec<u8>> {
+    // 1. Gestion des raccourcis CTRL (ex: Ctrl+C)
+    // On vérifie si la touche Control est pressée
+    if mods.control() {
+        if let Key::Character(c) = key {
+            let b = c.as_bytes();
+            if !b.is_empty() {
+                // En ASCII, Ctrl + touche correspond à la touche MASQUÉE par 0x1f
+                // Exemple: 'a' (97) & 0x1f = 1 (Code SOH/Ctrl+A)
+                return Some(vec![b[0] & 0x1f]);
+            }
+        }
+    }
+
+    // 2. Mapping des touches normales et spéciales
+    // Note l'utilisation de &key pour ne pas "déplacer" la valeur
+    match key {
+        // Touches de texte classiques
+        Key::Character(c) => Some(c.as_bytes().to_vec()),
+
+        // Touches nommées (spéciales)
+        Key::Named(named) => match named {
+            Named::Enter     => Some(vec![13]),    // Carriage Return
+            Named::Backspace => Some(vec![127]),   // DEL (standard Linux)
+            Named::Tab       => Some(vec![9]),     // Horizontal Tab
+            Named::Escape    => Some(vec![27]),    // ESC
+            
+            // Séquences d'échappement ANSI pour les flèches
+            Named::ArrowUp    => Some(vec![27, 91, 65]),
+            Named::ArrowDown  => Some(vec![27, 91, 66]),
+            Named::ArrowRight => Some(vec![27, 91, 67]),
+            Named::ArrowLeft  => Some(vec![27, 91, 68]),
+            
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
