@@ -90,17 +90,10 @@ impl MyApp {
 }
 
 
-
+// router message
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            // Actions de haut niveau (isolées dans des méthodes)
-            Message::Login(LoginMessage::Submit) => {
-                SshService::connect(
-                    self.current_profile.ip.clone(),
-                self.current_profile.port.parse().unwrap_or(22),
-                self.current_profile.username.clone(),
-                self.password.clone())
-            },
+
             Message::Ssh(SshMessage::Connected(Ok(handle))) => 
             {
                 SshService::open_shell(handle)
@@ -368,16 +361,22 @@ fn handle_login_msg(&mut self, msg: LoginMessage) -> Task<Message> {
         }
 
         // Lancement de la connexion SSH
-        LoginMessage::Submit => {
-            // On peut ajouter une petite validation ici
+       LoginMessage::Submit => {
+            // 1. Validation de sécurité
             if self.current_profile.ip.is_empty() || self.current_profile.username.is_empty() {
-                println!("LOG: Tentative de connexion avortée (champs vides)");
+                println!("LOG: Champs manquants pour la connexion.");
                 return Task::none();
             }
             
+            // 2. Appel au service SSH (on utilise ce que tu as déjà écrit)
             println!("LOG: Connexion vers {}...", self.current_profile.ip);
-            // On appelle la méthode de connexion que nous avons nettoyée
-            self.perform_ssh_connection()
+            
+            SshService::connect(
+                self.current_profile.ip.clone(),
+                self.current_profile.port.parse().unwrap_or(22),
+                self.current_profile.username.clone(),
+                self.password.clone()
+            )
         }
     }
 }
