@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use iced::{window, Event};
-use crate::{ssh::{MyHandler, SshChannel}, ui::{EditSection, theme::ThemeChoice}};
+use crate::{models::EditSection, ssh::{MyHandler, SshChannel}, ui::theme::ThemeChoice};
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
 

@@ -1,6 +1,7 @@
 pub mod messages;
 pub mod ssh;
 pub mod ui;
+pub mod models;
 
 use iced::{Task, widget::text_input, window};
 use ui::MyApp;

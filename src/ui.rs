@@ -11,8 +11,9 @@ use std::sync::Arc;
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
 use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage, SshMessage};
+use crate::models::{EditSection, Profile};
 // Mes modules internes
-use crate::ssh::{MyHandler, SshChannel};
+use crate::ssh::{MyHandler, SshChannel, SshService};
 use crate::ui::constants::*;
 use crate::ui::theme::ThemeChoice;
 //use crate::ui::views::login;
@@ -35,32 +36,6 @@ pub const SCROLLABLE_ID: &str = "terminal_scroll";
 // Nombre maximum de lignes à conserver dans le terminal (tampon)
 // usize est le type pour les tailles et indices non signés qui s'adapte à l'architecture (32 ou 64 bits)
 const MAX_TERMINAL_LINES: usize = 1000;
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
-pub struct Profile {
-    pub id: Uuid,
-    pub name: String,
-    pub ip: String,
-    pub port: String,
-    pub username: String,
-    pub group: String,
-    pub theme: ThemeChoice,
-}
-
-impl std::fmt::Display for Profile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}] {}", self.group.to_uppercase(), self.name)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EditSection {
-    General,
-    Auth,
-    Network,
-    Advanced,
-    Themes,
-}
 
 pub struct MyApp {
     pub password: String,
@@ -88,7 +63,7 @@ pub struct MyApp {
 
 impl MyApp {
     pub fn new(login_id: window::Id) -> Self {
-        let loaded_profiles = Self::load_profiles(); // <-- On charge ici
+        let loaded_profiles = Profile::load_all();
         println!(
             "DEBUG: {} profils chargés au démarrage",
             loaded_profiles.len()
@@ -114,128 +89,22 @@ impl MyApp {
     }
 }
 
-    fn perform_ssh_connection(&self) -> Task<Message> {
-        //println!("Tentative de connexion à {}...", self.current_profile.ip);
-        let profile = self.current_profile.ip.clone();
-        let user = self.current_profile.username.clone();
-        let pass = self.password.clone();
-        let port = self.current_profile.port.parse::<u16>().unwrap_or(22);
 
-        Task::stream(iced::stream::channel(100, move |mut output| async move {
-            let config = Arc::new(client::Config::default());
-            let handler = MyHandler {
-                sender: output.clone(),
-            };
-
-            if let Ok(mut handle) = client::connect(config, (profile.as_str(), port), handler).await
-            {
-                if handle
-                    .authenticate_password(user, pass)
-                    .await
-                    .unwrap_or(false)
-                {
-                    println!("Authentification réussie !");
-                    let _ = output
-                        .send(Message::Ssh(SshMessage::Connected(Ok(Arc::new(Mutex::new(handle))))))
-                        .await;
-                } else {
-                    println!("Échec de l'authentification.");
-                    let _ = output
-                        .send(Message::Ssh(SshMessage::Connected(Err("Échec d'authentification".into()))))
-                        .await;
-                }
-            } else {
-                let _ = output
-                    .send(Message::Ssh(SshMessage::Connected(Err("Serveur introuvable".into()))))
-                    .await;
-            }
-        }))
-    }
-
-    fn open_terminal(&self, handle: Arc<Mutex<client::Handle<MyHandler>>>) -> Task<Message> {
-        println!("Ouverture de la fenêtre terminal...");
-        let (id, win_task) = window::open(window::Settings {
-            size: iced::Size::new(950.0, 650.0),
-            ..Default::default()
-        });
-
-
-        // Dans ton code de connexion (pas dans le handler)
-        let manual_modes: Vec<(Pty, u32)> = vec![
-            (Pty::ICRNL, 1), // Convertir Carriage Return en Line Feed (Indispensable pour Enter)
-            (Pty::ONLCR, 1), // Convertir Line Feed en CR-LF (Indispensable pour l'affichage)
-        ];
-
-        let shell_task = Task::perform(
-            async move {
-                // 1. On ouvre la session et on libère le lock IMMÉDIATEMENT
-                let mut ch = {
-                    let mut h_lock = handle.lock().await;
-                    h_lock.channel_open_session().await.ok()?
-                }; // Le verrou h_lock est relâché ici !
-
-                // 2. Maintenant on peut configurer le canal sans bloquer le reste du client
-                // On remplace les let _ par des vérifications réelles
-                if let Err(e) = ch
-                    .request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes)
-                    .await
-                {
-                    eprintln!("Erreur PTY: {:?}", e);
-                    return None;
-                }
-
-                // 2. Ouverture Shell
-                ch.request_shell(true).await.ok()?;
-
-                // 3. LE TRUC MAGIQUE : On envoie un saut de ligne tout de suite
-                // pour forcer le Shell à afficher le prompt initial.
-
-                let initial_data: &[u8] = &[13];
-                ch.data(initial_data).await.ok();
-
-                println!("SYSTÈME: Shell interactif ouvert avec succès.");
-                Some(Arc::new(Mutex::new(ch)))
-            },
-            |ch|ch.map(|channel| Message::Ssh(SshMessage::SetChannel(channel)))
-       .unwrap_or(Message::DoNothing),
-        );
-
-        Task::batch(vec![
-            win_task.discard(),
-            Task::done(Message::Ssh(SshMessage::TerminalWindowOpened(id))),
-            shell_task,
-        ])
-    }
-
-    fn handle_window_closed(&mut self, id: window::Id) -> Task<Message> {
-        // 1. Si c'est le terminal, on ferme proprement le canal SSH
-        if Some(id) == self.terminal_window_id {
-            self.terminal_window_id = None;
-            if let Some(ch_arc) = self.active_channel.take() {
-                return Task::perform(
-                    async move {
-                        let ch = ch_arc.lock().await;
-                        let _ = ch.close().await;
-                    },
-                    |_| Message::DoNothing,
-                );
-            }
-        }
-
-        // 2. Si c'est le login, on tue tout le processus
-        if Some(id) == self.login_window_id {
-            std::process::exit(0);
-        }
-
-        // 3. Sinon, on ferme juste la fenêtre demandée
-        window::close(id)
-    }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             // Actions de haut niveau (isolées dans des méthodes)
-            Message::Login(LoginMessage::Submit) => self.perform_ssh_connection(),
-            Message::Ssh(SshMessage::Connected(Ok(handle))) => self.open_terminal(handle),
+            Message::Login(LoginMessage::Submit) => {
+                SshService::connect(
+                    self.current_profile.ip.clone(),
+                self.current_profile.port.parse().unwrap_or(22),
+                self.current_profile.username.clone(),
+                self.password.clone())
+            },
+            Message::Ssh(SshMessage::Connected(Ok(handle))) => 
+            {
+                SshService::open_shell(handle)
+            },
             Message::Ssh(SshMessage::Connected(Err(e))) => {
                 let error_msg = format!("\r\nErreur de connexion: {}\r\n", e);
 
@@ -244,24 +113,10 @@ impl MyApp {
                 self.parser.process(error_msg.as_bytes());
 
                 Task::none()
-            }
-
-            // Délégations aux modules
-            Message::Login(LoginMessage::InputIP(_))
-            | Message::Login(LoginMessage::InputPort(_))
-            | Message::Login(LoginMessage::InputUsername(_))
-            | Message::Login(LoginMessage::InputPass(_))
-            | Message::Profile(ProfileMessage::Save)
-            | Message::Profile(ProfileMessage::Delete)
-            | Message::Profile(ProfileMessage::New)
-            | Message::Profile(ProfileMessage::InputName(_))
-            | Message::Profile(ProfileMessage::InputGroup(_))
-            | Message::Profile(ProfileMessage::SearchChanged(_))
-            | Message::Profile(ProfileMessage::Selected(_))
-            | Message::Config(ConfigMessage::SectionChanged(_))
-          //  | Message::Config(ConfigMessage::ThemeChanged(_)) => login::update(self, message),
-          | Message::Config(ConfigMessage::ThemeChanged(_)) => views::update(self, message),
-           // | Message::TabPressed => login::update(self, message),
+            },
+            Message::Login(msg) => self.handle_login_msg(msg),
+            Message::Profile(msg)=> self.handle_profile_msg(msg),
+            Message::Config(msg) => self.handle_config_msg(msg),
             Message::QuitRequested => {
                 std::process::exit(0);
             }
@@ -363,72 +218,12 @@ impl MyApp {
         }
     }
 
-    // Sauvegarder la liste sur le disque
+    // proxy method 
+    // if save logic changes, only update this method without touching the rest of the codebase
     pub fn save_profiles(&self) {
-        // 1. Tentative de sérialisation
-        match serde_json::to_string_pretty(&self.profiles) {
-            Ok(json) => {
-                // 2. Tentative d'écriture atomique (on écrit tout d'un coup)
-                match std::fs::write("profiles.json", json) {
-                    Ok(_) => {
-                        println!("LOG: Sauvegarde réussie ({} profils).", self.profiles.len());
-                    }
-                    Err(e) => {
-                        eprintln!(
-                            "ERREUR CRITIQUE: Impossible d'écrire dans profiles.json: {}",
-                            e
-                        );
-                        // Ici, on pourrait ajouter une notification UI pour l'utilisateur
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("ERREUR: Échec de la conversion en JSON: {}", e);
-            }
-        }
+        Profile::save_all(&self.profiles);
     }
 
-    // Charger la liste au démarrage
-    pub fn load_profiles() -> Vec<Profile> {
-        let path = "profiles.json";
-
-        // 1. On vérifie d'abord si le fichier existe pour éviter de traiter une erreur inutile
-        if !std::path::Path::new(path).exists() {
-            println!("INFO : Aucun fichier profiles.json trouvé. Démarrage à vide.");
-            return Vec::new();
-        }
-
-        // 2. Tentative de lecture du fichier
-        match std::fs::read_to_string(path) {
-            Ok(data) => {
-                // 3. Tentative de parsing JSON
-                match serde_json::from_str::<Vec<Profile>>(&data) {
-                    Ok(profiles) => {
-                        println!("LOG : {} profil(s) chargé(s) avec succès.", profiles.len());
-                        profiles
-                    }
-                    Err(e) => {
-                        // C'est ici que l'erreur s'affichera si tes anciens profils n'ont pas d'ID
-                        println!(
-                            "ERREUR : Le fichier profiles.json est corrompu ou mal formé : {}",
-                            e
-                        );
-                        println!(
-                            "CONSEIL : Supprimez profiles.json pour qu'il soit recréé proprement."
-                        );
-                        Vec::new()
-                    }
-                }
-            }
-            Err(e) => {
-                println!(
-                    "ERREUR : Impossible de lire le fichier profiles.json : {}",
-                    e
-                );
-                Vec::new()
-            }
-        }
-    }
 
     fn map_event_to_bytes(&self,key: Key, mods: Modifiers, text: Option<String>) -> Option<Vec<u8>> {
         // Priorité 1 : Les raccourcis CTRL
@@ -460,4 +255,145 @@ impl MyApp {
             _ => None,
         }
     }
+
+        fn handle_window_closed(&mut self, id: window::Id) -> Task<Message> {
+        // 1. Si c'est le terminal, on ferme proprement le canal SSH
+        if Some(id) == self.terminal_window_id {
+            self.terminal_window_id = None;
+            if let Some(ch_arc) = self.active_channel.take() {
+                return Task::perform(
+                    async move {
+                        let ch = ch_arc.lock().await;
+                        let _ = ch.close().await;
+                    },
+                    |_| Message::DoNothing,
+                );
+            }
+        }
+
+        // 2. Si c'est le login, on tue tout le processus
+        if Some(id) == self.login_window_id {
+            std::process::exit(0);
+        }
+
+        // 3. Sinon, on ferme juste la fenêtre demandée
+        window::close(id)
+    }
+
+
+    fn handle_profile_msg(&mut self, msg: ProfileMessage) -> Task<Message> {
+        match msg {
+            ProfileMessage::Selected(id) => {
+                if let Some(profile) = self.profiles.iter().find(|p| p.id == id) {
+                    self.selected_profile_id = Some(id);
+                    self.current_profile = profile.clone();
+                }
+            }
+            ProfileMessage::InputName(name) => self.current_profile.name = name,
+            ProfileMessage::InputGroup(group) => self.current_profile.group = group,
+            ProfileMessage::SearchChanged(query) => self.search_query = query,
+            
+            ProfileMessage::Save => {
+                self.perform_save_profile();
+            }
+            
+            ProfileMessage::New => {
+                self.selected_profile_id = None;
+                self.current_profile = Profile::default();
+            }
+            
+            ProfileMessage::Delete => {
+                if let Some(id) = self.selected_profile_id {
+                    self.profiles.retain(|p| p.id != id);
+                    self.selected_profile_id = None;
+                    self.current_profile = Profile::default();
+                    self.save_profiles();
+                }
+            }
+        }
+        Task::none()
+    }
+
+    fn perform_save_profile(&mut self) {
+        if self.current_profile.ip.is_empty() || self.current_profile.name.is_empty() {
+            return;
+        }
+
+        // Normalisation du groupe
+        if self.current_profile.group.is_empty() {
+            self.current_profile.group = "DEFAUT".to_string();
+        }
+        self.current_profile.group = self.current_profile.group.to_uppercase();
+
+        match self.selected_profile_id {
+            Some(id) => {
+                if let Some(index) = self.profiles.iter().position(|p| p.id == id) {
+                    let mut updated = self.current_profile.clone();
+                    updated.id = id;
+                    self.profiles[index] = updated;
+                }
+            }
+            None => {
+                let mut new_p = self.current_profile.clone();
+                new_p.id = uuid::Uuid::new_v4();
+                self.selected_profile_id = Some(new_p.id);
+                self.profiles.push(new_p);
+            }
+        }
+
+        self.profiles.sort_by(|a, b| a.group.cmp(&b.group).then(a.name.cmp(&b.name)));
+        self.save_profiles();
+    }
+
+    // Dans src/ui.rs, à l'intérieur du bloc impl MyApp
+
+fn handle_login_msg(&mut self, msg: LoginMessage) -> Task<Message> {
+    match msg {
+        // Mise à jour des champs du profil "brouillon"
+        LoginMessage::InputIP(ip) => {
+            self.current_profile.ip = ip;
+            Task::none()
+        }
+        LoginMessage::InputPort(port) => {
+            self.current_profile.port = port;
+            Task::none()
+        }
+        LoginMessage::InputUsername(user) => {
+            self.current_profile.username = user;
+            Task::none()
+        }
+        LoginMessage::InputPass(pass) => {
+            self.password = pass;
+            Task::none()
+        }
+
+        // Lancement de la connexion SSH
+        LoginMessage::Submit => {
+            // On peut ajouter une petite validation ici
+            if self.current_profile.ip.is_empty() || self.current_profile.username.is_empty() {
+                println!("LOG: Tentative de connexion avortée (champs vides)");
+                return Task::none();
+            }
+            
+            println!("LOG: Connexion vers {}...", self.current_profile.ip);
+            // On appelle la méthode de connexion que nous avons nettoyée
+            self.perform_ssh_connection()
+        }
+    }
+}
+
+fn handle_config_msg(&mut self, msg: ConfigMessage) -> Task<Message> {
+    match msg {
+        ConfigMessage::SectionChanged(section) => {
+            println!("LOG: Changement de section vers : {:?}", section);
+            self.active_section = section;
+        }
+        ConfigMessage::ThemeChanged(new_theme) => {
+            self.current_profile.theme = new_theme;
+            // On sauvegarde immédiatement pour que le choix persiste au redémarrage
+            self.save_profiles();
+        }
+    }
+    Task::none()
+}
 }
