@@ -36,7 +36,8 @@ pub enum SshMessage {
     SetChannel(Arc<Mutex<SshChannel>>),
     DataReceived(Vec<u8>),  // Ancien SshData
     SendData(Vec<u8>),      // Ancien SendSshRaw ou RawKey
-    TerminalWindowOpened(window::Id),
+    //TerminalWindowOpened(window::Id),
+    TerminalWindowOpened(iced::window::Id, crate::ssh::SshHandle),
 }
 
 #[derive(Clone, Debug)]
@@ -48,6 +49,7 @@ pub enum ProfileMessage {
     InputName(String),
     InputGroup(String),
     SearchChanged(String),
+    TerminalCountChanged(usize),
 }
 
 #[derive(Clone, Debug)]

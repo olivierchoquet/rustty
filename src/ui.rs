@@ -28,8 +28,8 @@ pub mod components {
     pub mod actions_bar;
     pub mod brand;
     pub mod forms;
-    pub mod sidebar;
     pub mod search_table;
+    pub mod sidebar;
 }
 
 // Identifiant unique pour le widget scrollable du terminal
@@ -45,7 +45,8 @@ pub struct MyApp {
     // pub terminal_lines: Vec<Vec<TextSegment>>,
     pub parser: vt100::Parser,
     pub login_window_id: Option<window::Id>,
-    pub terminal_window_id: Option<window::Id>,
+    //pub terminal_window_id: Option<window::Id>,
+    pub terminal_window_ids: Vec<window::Id>,
     pub active_channel: Option<Arc<Mutex<SshChannel>>>, // La session SSH active
     pub history: Vec<String>,                           // Liste des commandes passées
     pub history_index: Option<usize>,                   // Position actuelle dans l'historique
@@ -75,7 +76,7 @@ impl MyApp {
             // On initialise un terminal de 24 lignes et 80 colonnes
             parser: vt100::Parser::new(24, 80, MAX_TERMINAL_LINES),
             login_window_id: Some(login_id),
-            terminal_window_id: None,
+            terminal_window_ids: Vec::new(),
             active_channel: None,
             history: Vec::new(),
             history_index: None,
@@ -115,7 +116,7 @@ impl MyApp {
 
     // delegate view rendering to submodules
     pub fn view(&self, window_id: window::Id) -> Element<'_, Message> {
-        if Some(window_id) == self.terminal_window_id {
+        if self.terminal_window_ids.contains(&window_id) {
             terminal::render(self)
         } else {
             dashboard::render(self)
@@ -129,26 +130,37 @@ impl MyApp {
     }
 
     fn handle_window_closed(&mut self, id: window::Id) -> Task<Message> {
-        // 1. Si c'est le terminal, on ferme proprement le canal SSH
-        if Some(id) == self.terminal_window_id {
-            self.terminal_window_id = None;
-            if let Some(ch_arc) = self.active_channel.take() {
-                return Task::perform(
-                    async move {
-                        let ch = ch_arc.lock().await;
-                        let _ = ch.close().await;
-                    },
-                    |_| Message::DoNothing,
-                );
+        // 1. On vérifie si l'ID fermé appartient à notre liste de terminaux
+        if self.terminal_window_ids.contains(&id) {
+            // On retire cet ID spécifique de la liste
+            self.terminal_window_ids.retain(|&w_id| w_id != id);
+
+            // Si c'était le dernier terminal ouvert, on coupe le SSH
+            if self.terminal_window_ids.is_empty() {
+                if let Some(ch_arc) = self.active_channel.take() {
+                    // On ferme le canal asynchronement, puis on ferme la fenêtre
+                    return Task::batch(vec![
+                        Task::perform(
+                            async move {
+                                let ch = ch_arc.lock().await;
+                                let _ = ch.close().await;
+                            },
+                            |_| Message::DoNothing,
+                        ),
+                        window::close(id),
+                    ]);
+                }
             }
+            // S'il reste d'autres terminaux, on ferme juste cette fenêtre
+            return window::close(id);
         }
 
-        // 2. Si c'est le login, on tue tout le processus
+        // 2. Si c'est la fenêtre de gestion (Login/Dashboard), on quitte l'app
         if Some(id) == self.login_window_id {
             std::process::exit(0);
         }
 
-        // 3. Sinon, on ferme juste la fenêtre demandée
+        // 3. Par sécurité pour toute autre fenêtre
         window::close(id)
     }
 
@@ -163,6 +175,10 @@ impl MyApp {
             ProfileMessage::InputName(name) => self.current_profile.name = name,
             ProfileMessage::InputGroup(group) => self.current_profile.group = group,
             ProfileMessage::SearchChanged(query) => self.search_query = query,
+            ProfileMessage::TerminalCountChanged(new_count) => {
+                // On contraint la valeur entre 1 et 5
+                self.current_profile.terminal_count = new_count.clamp(1, 5);
+            }
 
             ProfileMessage::Save => {
                 self.perform_save_profile();
@@ -274,38 +290,71 @@ impl MyApp {
         }
         Task::none()
     }
+   
+   fn handle_ssh_msg(&mut self, msg: SshMessage) -> Task<Message> {
+    match msg {
+        // 1. Ouverture des fenêtres en grille
+        SshMessage::Connected(Ok(handle)) => {
+            let count = self.current_profile.terminal_count.max(1);
+            let mut tasks = Vec::new();
+            let win_w = 900.0;
+            let win_h = 600.0;
+            let gap = 20.0;
+            let margin = 80.0;
+            let max_cols = 2;
 
-    fn handle_ssh_msg(&mut self, msg: SshMessage) -> Task<Message> {
-        match msg {
-            // 1. Déclenche l'ouverture de la fenêtre
-            SshMessage::Connected(Ok(handle)) => crate::ssh::SshService::open_shell(handle),
+            for i in 0..count {
+                let col = (i as u32) % max_cols;
+                let row = (i as u32) / max_cols;
+                let x = margin + (col as f32 * (win_w + gap));
+                let y = margin + (row as f32 * (win_h + gap));
 
-            // 2. LA PIÈCE MANQUANTE : Enregistre l'ID de la fenêtre ouverte
-            SshMessage::TerminalWindowOpened(id) => {
-                println!("LOG: Nouvelle fenêtre terminal détectée (ID: {:?})", id);
-                self.terminal_window_id = Some(id);
-                Task::none()
+                let settings = window::Settings {
+                    size: (win_w, win_h).into(),
+                    position: window::Position::Specific(iced::Point::new(x, y)),
+                    exit_on_close_request: true,
+                    ..Default::default()
+                };
+
+                let (_id, win_task) = window::open(settings);
+                let handle_for_closure = handle.clone(); 
+
+                tasks.push(
+                    win_task.map(move |id| {
+                        Message::Ssh(SshMessage::TerminalWindowOpened(id, handle_for_closure.clone()))
+                    })
+                );
             }
-
-            // 3. Stocke le canal pour pouvoir envoyer des touches plus tard
-            SshMessage::SetChannel(ch) => {
-                self.active_channel = Some(ch);
-                Task::none()
-            }
-
-            // 4. Réception des données (VT100)
-            SshMessage::DataReceived(raw_bytes) => {
-                self.parser.process(&raw_bytes);
-                scrollable::snap_to::<Message>(
-                    scrollable::Id::new(SCROLLABLE_ID),
-                    scrollable::RelativeOffset::END,
-                )
-            }
-
-            // ... reste de ton match (SendData, etc.)
-            _ => Task::none(),
+            Task::batch(tasks)
         }
+
+        // 2. Initialisation du shell quand la fenêtre est prête
+        SshMessage::TerminalWindowOpened(id, handle) => {
+            self.terminal_window_ids.push(id);
+            crate::ssh::SshService::open_shell(handle)
+        }
+
+        // 3. Réception des données SSH (Le "Prompt")
+        SshMessage::DataReceived(raw_bytes) => {
+            // On envoie les octets bruts au parser VT100 pour interpréter les couleurs et le texte
+            self.parser.process(&raw_bytes);
+            
+            // On force le scroll vers le bas pour voir les dernières lignes
+            scrollable::snap_to::<Message>(
+                scrollable::Id::new(SCROLLABLE_ID),
+                scrollable::RelativeOffset::END,
+            )
+        }
+
+        // 4. Stockage du canal actif pour l'envoi de touches
+        SshMessage::SetChannel(ch) => {
+            self.active_channel = Some(ch);
+            Task::none()
+        }
+
+        _ => Task::none(),
     }
+}
 
     fn handle_keyboard_event(&mut self, event: iced::Event) -> Task<Message> {
         if let iced::Event::Keyboard(iced::keyboard::Event::KeyPressed { key, modifiers, .. }) =

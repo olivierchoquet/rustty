@@ -14,6 +14,7 @@ pub struct Profile {
     pub username: String,
     pub group: String,
     pub theme: ThemeChoice,
+    pub terminal_count: usize
 }
 
 impl std::fmt::Display for Profile {
@@ -24,6 +25,19 @@ impl std::fmt::Display for Profile {
 
 impl Profile {
     const FILE_PATH: &'static str = "profiles.json";
+
+    pub fn default() -> Self {
+        Self {
+            id: uuid::Uuid::new_v4(),
+            name: "Nouveau Profil".into(),
+            group: "DEFAUT".into(),
+            ip: "".into(),
+            port: "22".into(),
+            username: "".into(),
+            theme: crate::ui::theme::ThemeChoice::Slate, 
+            terminal_count: 1,
+        }
+    }
 
     /// Charge tous les profils depuis le disque
     pub fn load_all() -> Vec<Self> {

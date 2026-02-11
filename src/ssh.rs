@@ -10,6 +10,9 @@ use tokio::sync::Mutex;
 
 pub type SshChannel = russh::Channel<russh::client::Msg>;
 
+// Alias pour simplifier la signature du Handle SSH
+pub type SshHandle = std::sync::Arc<tokio::sync::Mutex<russh::client::Handle<MyHandler>>>;
+
 pub struct MyHandler {
     pub sender: mpsc::Sender<Message>,
 }
@@ -61,39 +64,27 @@ impl SshService {
         }))
     }
 
-    /// Crée la tâche d'ouverture du shell PTY
-    pub fn open_shell(handle: Arc<Mutex<client::Handle<MyHandler>>>) -> Task<Message> {
-        let (id, win_task) = window::open(window::Settings {
-            size: iced::Size::new(950.0, 650.0),
-            ..Default::default()
-        });
+    /// Ne s'occupe QUE du canal SSH, plus de la fenêtre
+pub fn open_shell(handle: Arc<Mutex<client::Handle<MyHandler>>>) -> Task<Message> {
+    let manual_modes: Vec<(Pty, u32)> = vec![
+        (Pty::ICRNL, 1),
+        (Pty::ONLCR, 1),
+    ];
 
-        let manual_modes: Vec<(Pty, u32)> = vec![
-            (Pty::ICRNL, 1),
-            (Pty::ONLCR, 1),
-        ];
+    Task::perform(
+        async move {
+            let mut ch = {
+                let mut h_lock = handle.lock().await;
+                h_lock.channel_open_session().await.ok()?
+            }; 
 
-        let shell_task = Task::perform(
-            async move {
-                let mut ch = {
-                    let mut h_lock = handle.lock().await;
-                    h_lock.channel_open_session().await.ok()?
-                }; 
-
-                ch.request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes).await.ok()?;
-                ch.request_shell(true).await.ok()?;
-                
-                
-                Some(Arc::new(Mutex::new(ch)))
-            },
-            |ch| ch.map(|channel| Message::Ssh(SshMessage::SetChannel(channel)))
-                   .unwrap_or(Message::DoNothing),
-        );
-
-        Task::batch(vec![
-            win_task.discard(),
-            Task::done(Message::Ssh(SshMessage::TerminalWindowOpened(id))),
-            shell_task,
-        ])
-    }
+            ch.request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes).await.ok()?;
+            ch.request_shell(true).await.ok()?;
+            
+            Some(Arc::new(Mutex::new(ch)))
+        },
+        |ch| ch.map(|channel| Message::Ssh(SshMessage::SetChannel(channel)))
+               .unwrap_or(Message::DoNothing),
+    )
+}
 }

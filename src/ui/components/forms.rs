@@ -1,11 +1,12 @@
 use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage};
 use crate::ui::theme::{self, ThemeChoice};
-use crate::ui::{ MyApp, theme::TerminalColors};
+use crate::ui::{MyApp, theme::TerminalColors};
+use iced::alignment::{Horizontal, Vertical};
 use iced::font::Weight;
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Color, Element, Font, Length};
+use iced::{Alignment, Color, Element, Font, Length};
 
-// general form (sidebar) 
+// general form (sidebar)
 pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     column![
         text("ÉDITION DU PROFIL")
@@ -89,6 +90,12 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             ),
         ]
         .spacing(10),
+        column![
+            text("OPTIONS DE SESSION").size(12).color(colors.accent),
+            // On passe colors directement (par valeur/copie)
+            terminal_count_selector(app.current_profile.terminal_count, colors),
+        ]
+        .spacing(8),
     ]
     .spacing(15)
     .into()
@@ -130,6 +137,48 @@ fn render_input_with_label<'a>(
     }
 
     col.into()
+}
+
+pub fn terminal_count_selector<'a>(current_count: usize, colors: TerminalColors) -> Element<'a, Message> {
+    row![
+        text("Nombre de fenêtres :")
+            .width(Length::Fill)
+            .color(colors.text), 
+        
+        // Bouton Moins
+        button(
+            text("-")
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center)
+        )
+        .on_press(Message::Profile(ProfileMessage::TerminalCountChanged(
+            current_count.saturating_sub(1)
+        )))
+        .width(35),
+
+        // Valeur actuelle centrée
+        container(
+            text(current_count.to_string())
+                .color(colors.text)
+                .size(18)
+        )
+        .width(40)
+        .align_x(Horizontal::Center),
+
+        // Bouton Plus
+        button(
+            text("+")
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center)
+        )
+        .on_press(Message::Profile(ProfileMessage::TerminalCountChanged(
+            current_count.saturating_add(1)
+        )))
+        .width(35),
+    ]
+    .spacing(10)
+    .align_y(Alignment::Center)
+    .into()
 }
 
 // Le formulaire pour l'onglet Auth  - NON UTILISE POUR L'INSTANT - utilisateur et mot de passe dans l'onglet Général

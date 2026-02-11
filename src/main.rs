@@ -39,7 +39,7 @@ pub fn main() -> iced::Result {
         .run_with(|| {
             // Initialisation de la fenêtre principale (Login)
             let (id, task) = window::open(window::Settings {
-                size: iced::Size::new(950.0, 850.0),
+                size: iced::Size::new(950.0, 900.0),
                 ..Default::default()
             });
 
