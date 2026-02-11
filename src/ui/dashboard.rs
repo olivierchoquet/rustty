@@ -4,8 +4,8 @@ use iced::{
     widget::{column, container, horizontal_rule, row, text, text_input, vertical_space},
 };
 
-use crate::{messages::{ConfigMessage, LoginMessage, Message, ProfileMessage}, ui::{EditSection, MyApp, Profile, components::{forms::{general_form, theme_form}, table::{content, header}}, theme}};
-use crate::ui::components::{actions, sidebar};
+use crate::{messages::{ConfigMessage, LoginMessage, Message, ProfileMessage}, ui::{EditSection, MyApp, Profile, components::{forms::{general_form, theme_form}, search_table::{content, header}}, theme}};
+use crate::ui::components::{actions_bar, sidebar};
 
 //use crate::ui::constants::*;
 
@@ -71,7 +71,7 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
     };
 
     // 4. Barre d'actions commune à tous les onglets (Sauvegarder, Supprimer, Démarrer, Quitter)
-    let actions_bar = actions::buttons_form(colors, app.selected_profile_id.is_some());
+    let actions_bar = actions_bar::buttons_form(colors, app.selected_profile_id.is_some());
     // 5. ASSEMBLAGE FINAL ---
     column![
         row![

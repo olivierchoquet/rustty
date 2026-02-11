@@ -25,11 +25,11 @@ pub mod dashboard;
 pub mod terminal;
 pub mod theme;
 pub mod components {
-    pub mod actions;
+    pub mod actions_bar;
     pub mod brand;
     pub mod forms;
     pub mod sidebar;
-    pub mod table;
+    pub mod search_table;
 }
 
 // Identifiant unique pour le widget scrollable du terminal

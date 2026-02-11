@@ -167,7 +167,7 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
     column![tab_bar, terminal_scroll, status_bar].into()
 }
 
-// --- HELPERS CORRIGÉS (Plus de références &) ---
+// --- HELPERS
 
 fn render_text_chunk(
     txt: String,

@@ -3,9 +3,9 @@ use crate::ui::theme::{self, ThemeChoice};
 use crate::ui::{ MyApp, theme::TerminalColors};
 use iced::font::Weight;
 use iced::widget::{button, column, container, row, scrollable, text, text_input};
-use iced::{Alignment, Color, Element, Font, Length, Theme};
+use iced::{Color, Element, Font, Length};
 
-// Le formulaire pour l'onglet Général
+// general form (sidebar) 
 pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     column![
         text("ÉDITION DU PROFIL")
@@ -16,10 +16,6 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
             })
             .color(colors.accent),
         row![
-            /*text_input("Nom du profil", &app.current_profile.name)
-            .on_input(Message::InputNewProfileName)
-            .padding(10)
-            .style(move |t, s| crate::ui::theme::input_style(colors, s)),*/
             render_input_with_label(
                 "Nom du profil",
                 &app.current_profile.name,
@@ -39,7 +35,6 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                //Message::InputNewProfileGroup,
                 |s| Message::Profile(ProfileMessage::InputGroup(s)),
                 None
             ),
@@ -89,9 +84,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 Some("⚠️ Non enregistré dans le profil pour votre sécurité"),
                 true,
-                //Message::InputPass,
                 |s| Message::Login(LoginMessage::InputPass(s)),
-                //Some(Message::ButtonConnection)
                 Some(Message::Login(LoginMessage::Submit))
             ),
         ]
