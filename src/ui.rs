@@ -41,28 +41,20 @@ const MAX_TERMINAL_LINES: usize = 1000;
 
 pub struct MyApp {
     pub password: String,
-    //pub logs: Vec<TextSegment>, // Contient tout le texte affiché dans le terminal
-    // Une liste de lignes. Chaque ligne contient ses segments colorés.
-    // pub terminal_lines: Vec<Vec<TextSegment>>,
-    //pub parser: vt100::Parser,
     pub login_window_id: Option<window::Id>,
-    //pub terminal_window_id: Option<window::Id>,
     pub ssh_handle: Option<crate::ssh::SshHandle>,
     // On stocke l'accès à l'ID du handler ici
     pub handler_id_controller: Option<Arc<Mutex<Option<window::Id>>>>,
     pub terminal_window_ids: Vec<window::Id>,
+    // one vt100 parser by terminal window
     pub parsers: HashMap<window::Id, vt100::Parser>,
+    // each ssh channel by terminal window
     pub active_channels: HashMap<window::Id, Arc<Mutex<SshChannel>>>,
-    //pub active_channel: Option<Arc<Mutex<SshChannel>>>, // La session SSH active
-    pub history: Vec<String>,         // Liste des commandes passées
-    pub history_index: Option<usize>, // Position actuelle dans l'historique
     pub focus_index: usize,           // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
-    // pub theme_choice: ThemeChoice,
     // Gestion des profils
     pub current_profile: Profile, // Le "brouillon" lié aux inputs
     pub selected_profile_id: Option<uuid::Uuid>, // L'ID du profil qu'on est en train d'éditer
     pub profiles: Vec<Profile>,
-    //pub password: String,         // On le garde à part (sécurité)
     pub search_query: String, // Pour le filtrage global
     // Catégorie de parammètres en cours d'édition
     pub active_section: EditSection,
@@ -80,15 +72,10 @@ impl MyApp {
         );
         Self {
             password: "".into(),
-            //logs: String::from("Prêt...\n"),
-            // On initialise un terminal de 24 lignes et 80 colonnes
-            //parser: vt100::Parser::new(24, 80, MAX_TERMINAL_LINES),
             parsers: HashMap::new(),
             login_window_id: Some(login_id),
             terminal_window_ids: Vec::new(),
             active_channels: HashMap::new(),
-            history: Vec::new(),
-            history_index: None,
             focus_index: 0,
             profiles: loaded_profiles,
             selected_profile_id: None,
