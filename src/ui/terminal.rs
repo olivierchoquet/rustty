@@ -12,9 +12,24 @@ use iced::widget::{button, column, container, pick_list, row, scrollable, text, 
 use iced::{Alignment, Element, Length, Task};
 use vt100;
 
-pub fn render(app: &MyApp) -> Element<'_, Message> {
+pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> {
     let colors = app.current_profile.theme.get_colors();
-    let screen = app.parser.screen();
+
+// --- CHANGEMENT ICI ---
+    // On va chercher le parser spécifique à cette fenêtre.pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> {
+    // Si on ne le trouve pas, on affiche un message d'attente.
+    let Some(parser) = app.parsers.get(&window_id) else {
+        return container(text("Connexion en cours...").color(colors.text))
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .style(move |_| container::Style {
+                background: Some(colors.bg.into()),
+                ..Default::default()
+            })
+            .into();
+    };
+
+    let screen = parser.screen();
     let (rows, cols) = screen.size();
     let (cursor_row, cursor_col) = screen.cursor_position();
 
@@ -129,8 +144,16 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
                 ..Default::default()
             }),
     )
-    .id(scrollable::Id::new(SCROLLABLE_ID))
+    //.id(scrollable::Id::new(SCROLLABLE_ID))
+    .id(scrollable::Id::new(format!("scroll_{:?}", window_id)))
     .height(Length::Fill);
+
+    // --- AJOUT DU FOCUS AU CLIC ---
+    // On enveloppe le scrollable dans un bouton transparent qui couvre toute la zone
+    let interactive_terminal = button(terminal_scroll)
+    .padding(0)
+    .style(iced::widget::button::secondary) // Ou un style transparent personnalisé
+    .on_press(Message::Ssh(SshMessage::WindowFocused(window_id)));
 
     // --- 3. BARRE D'ÉTAT (Footer) ---
     let status_bar = container(
@@ -164,7 +187,7 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
         ..Default::default()
     });
 
-    column![tab_bar, terminal_scroll, status_bar].into()
+    column![tab_bar, interactive_terminal, status_bar].into()
 }
 
 // --- HELPERS

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use iced::{window, Event};
-use crate::{models::EditSection, ssh::{MyHandler, SshChannel}, ui::theme::ThemeChoice};
+use crate::{models::EditSection, ssh::{MyHandler, SshChannel, SshHandle}, ui::theme::ThemeChoice};
 // Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
 
@@ -32,13 +32,22 @@ pub enum LoginMessage {
 
 #[derive(Clone)]
 pub enum SshMessage {
-    Connected(Result<Arc<Mutex<russh::client::Handle<MyHandler>>>, String>),
-    SetChannel(Arc<Mutex<SshChannel>>),
-    DataReceived(Vec<u8>),  // Ancien SshData
+    Connected(Result<(crate::ssh::SshHandle, Arc<Mutex<Option<iced::window::Id>>>), String>),
+    //Connected(Result<Arc<Mutex<russh::client::Handle<MyHandler>>>, String>),
+   // SetChannel(Arc<Mutex<SshChannel>>),
+   // DataReceived(Vec<u8>),  // Ancien SshData
     SendData(Vec<u8>),      // Ancien SendSshRaw ou RawKey
     //TerminalWindowOpened(window::Id),
-    TerminalWindowOpened(iced::window::Id, crate::ssh::SshHandle),
+    //TerminalWindowOpened(iced::window::Id, crate::ssh::SshHandle),
+    TerminalWindowOpened(window::Id, SshHandle, Arc<Mutex<Option<window::Id>>>),
+
+    // Ajout de l'ID ici pour savoir quel canal appartient à quelle fenêtre
+    SetChannel(iced::window::Id, crate::ssh::SshChannelArc), 
+    // Ajout de l'ID ici pour savoir quelle fenêtre mettre à jour
+    DataReceived(iced::window::Id, Vec<u8>),
+    WindowFocused(iced::window::Id),
 }
+    // Ajout de l'ID ici pour savoir quel canal appartient à quell
 
 #[derive(Clone, Debug)]
 pub enum ProfileMessage {
