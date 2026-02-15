@@ -9,13 +9,12 @@ use ui::MyApp;
 use crate::{messages::Message, ui::constants::*};
 
 pub fn main() -> iced::Result {
-    // 1. Configuration du daemon Iced
+    // idec daemon to manage multiple windows and global events
     iced::daemon("RustTy", MyApp::update, MyApp::view)
-        //En écrivant |_|,
-        //tu disais à Rust : "Reçois cet argument, mais je m'en fiche, je ne vais pas l'appeler à l'intérieur de mon code".
-        //si on veut l'utiliser donc |app|
+        //By writing |_|,
+        //you were telling Rust: “Receive this argument, but I don't care about it, I'm not going to call it inside my code.”
+        //So if we want to use it, then |app|
         .subscription(|_| {
-            // Gestion des événements de fenêtre (Ouverture/Fermeture)
             let window_events = window::events().map(|(id, event)| match event {
                 window::Event::Opened { .. } => Message::WindowOpened(id),
                 window::Event::CloseRequested | window::Event::Closed => Message::WindowClosed(id),
@@ -24,20 +23,18 @@ pub fn main() -> iced::Result {
 
             let events = iced::event::listen_with(|event, status, _id| {
                 match status {
-                    // Si un widget (comme un TextInput) a déjà utilisé l'événement,
-                    // on ne fait rien pour ne pas interférer.
+                    // If a widget (like a TextInput) has already captured the event, we do nothing to avoid interference.
                     iced::event::Status::Captured => None,
 
-                    // Si l'événement est libre (Ignored), on l'envoie à l'update
+                    // If the event is not captured, we forward it to the app for processing (like global shortcuts).
                     iced::event::Status::Ignored => Some(Message::Event(event)),
                 }
             });
 
-            // Fusion des abonnements
             iced::Subscription::batch(vec![window_events, events])
         })
         .run_with(|| {
-            // Initialisation de la fenêtre principale (Login)
+            // Init the first window and get its ID and the task to open it
             let (id, task) = window::open(window::Settings {
                 size: iced::Size::new(950.0, 900.0),
                 ..Default::default()
@@ -47,7 +44,7 @@ pub fn main() -> iced::Result {
                 MyApp::new(id),
                 Task::batch(vec![
                     task.discard(),
-                    // C'est ici que l'on force le curseur sur le champ PROFILE_NAME au lancement
+                    // Focus the TextInput PROFILE_NAME in the new window to allow immediate typing
                     text_input::focus(text_input::Id::new(ID_PROFILE)),
                 ]),
             )

@@ -4,17 +4,14 @@ use iced::keyboard::{Key, Modifiers};
 use iced::widget::{scrollable, text_input};
 use iced::{Element, Task, window};
 use std::collections::HashMap;
-use uuid::Uuid;
-// concurrency
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 // Internal module imports
 use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage, SshMessage};
 use crate::models::{EditSection, Profile};
-use crate::ssh::{MyHandler, SshChannel, SshService};
+use crate::ssh::{SshChannel, SshService};
 use crate::ui::constants::*;
-//use vt100;
 
 pub mod constants;
 pub mod dashboard;

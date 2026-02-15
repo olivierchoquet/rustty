@@ -9,18 +9,19 @@ pub enum ThemeChoice {
     Slate,
     Matrix,
     Cyberpunk,
-    Nord,       // Nouveau : Élégant et froid
-    Solarized,  // Nouveau : Classique des développeurs
-    Dracula,    // Nouveau : Le célèbre thème sombre
-    Tos,        // Nouveau : Style vieux BIOS / Amstrad
-    Gruvbox,    // Tons terreux, ambiance "Old School"
-    TokyoNight, // Bleu profond et néons roses/violets
-    Coffee,     // Tons marrons et crème, très doux
-    Ghost,      // Minimaliste, nuances de gris et blanc pur
-    Catppuccin, // Le nouveau standard (très doux/pastel)
-    Everforest, // Verts organiques, ultra-reposant
-    RoséPine,   // Tons sourds, très "design"
-    AyuMirage,  // Un entre-deux parfait, moderne et lisible
+    Nord,       // New: Elegant and cool
+    Solarized,  // New: Developer classic
+    Dracula,    // New: The famous dark theme
+    Tos,        // New: Old BIOS/Amstrad style
+    Gruvbox,    // Earthy tones, “old school” vibe
+    TokyoNight, // Deep blue and pink/purple neon lights
+    Coffee,     // Brown and cream tones, very soft
+    Ghost,      // Minimalist, shades of gray and pure white
+    Catppuccin, // The new standard (very soft/pastel)
+    Everforest, // Organic greens, ultra-relaxing
+    RoséPine,   // Muted tones, very “design”
+    AyuMirage,  // A perfect in-between, modern and readable
+
 }
 
 impl ThemeChoice {
@@ -87,9 +88,9 @@ impl ThemeChoice {
                 surface: Color::from_rgb(0.03, 0.21, 0.26),
             },
             ThemeChoice::Tos => TerminalColors {
-                bg: Color::from_rgb(0.0, 0.0, 0.75),    // Bleu pur "vieux BIOS"
-                text: Color::from_rgb(1.0, 1.0, 1.0),   // Blanc
-                prompt: Color::from_rgb(1.0, 1.0, 0.0), // Jaune vif
+                bg: Color::from_rgb(0.0, 0.0, 0.75),    // Blue "old BIOS"
+                text: Color::from_rgb(1.0, 1.0, 1.0),   // White
+                prompt: Color::from_rgb(1.0, 1.0, 0.0), // Yellow
                 accent: Color::from_rgb(0.0, 1.0, 1.0), // Cyan
                 surface: Color::from_rgb(0.0, 0.0, 0.5),
             },
@@ -123,28 +124,28 @@ impl ThemeChoice {
             },
             ThemeChoice::Catppuccin => TerminalColors {
                 bg: Color::from_rgb(0.11, 0.11, 0.17),     // Mocha Base
-                text: Color::from_rgb(0.8, 0.84, 0.95),    // Text (bleuté très doux)
+                text: Color::from_rgb(0.8, 0.84, 0.95),    // Text (blue)
                 prompt: Color::from_rgb(0.8, 0.95, 0.75),  // Green (pastel)
                 accent: Color::from_rgb(0.79, 0.72, 0.96), // Lavender
                 surface: Color::from_rgb(0.12, 0.12, 0.19),
             },
             ThemeChoice::Everforest => TerminalColors {
-                bg: Color::from_rgb(0.17, 0.2, 0.18), // Vert forêt sombre et mat
-                text: Color::from_rgb(0.83, 0.82, 0.72), // Crème (zéro fatigue)
-                prompt: Color::from_rgb(0.64, 0.75, 0.5), // Vert sauge
-                accent: Color::from_rgb(0.89, 0.7, 0.44), // Orange sourd
+                bg: Color::from_rgb(0.17, 0.2, 0.18), // Dark forest green and matte
+                text: Color::from_rgb(0.83, 0.82, 0.72), // Cream (zero fatigue)
+                prompt: Color::from_rgb(0.64, 0.75, 0.5), // Sage green
+                accent: Color::from_rgb(0.89, 0.7, 0.44), // Muted orange
                 surface: Color::from_rgb(0.2, 0.23, 0.21),
             },
             ThemeChoice::RoséPine => TerminalColors {
-                bg: Color::from_rgb(0.07, 0.07, 0.1), // Base (bleu-nuit profond)
-                text: Color::from_rgb(0.88, 0.88, 0.95), // Rose pétale très clair
-                prompt: Color::from_rgb(0.96, 0.74, 0.74), // Rose/Rouge sourd
-                accent: Color::from_rgb(0.61, 0.8, 0.85), // Mousse
+                bg: Color::from_rgb(0.07, 0.07, 0.1), // Base (blue-night dark)
+                text: Color::from_rgb(0.88, 0.88, 0.95), // Rose light
+                prompt: Color::from_rgb(0.96, 0.74, 0.74), // Rose/Rouge (soft)
+                accent: Color::from_rgb(0.61, 0.8, 0.85), // Pine (bleu doux)
                 surface: Color::from_rgb(0.1, 0.1, 0.15),
             },
             ThemeChoice::AyuMirage => TerminalColors {
-                bg: Color::from_rgb(0.1, 0.13, 0.18),      // Gris-bleu équilibré
-                text: Color::from_rgb(0.8, 0.8, 0.8),      // Gris neutre
+                bg: Color::from_rgb(0.1, 0.13, 0.18),      // Gray-blue balanced
+                text: Color::from_rgb(0.8, 0.8, 0.8),      // Gray neutral
                 prompt: Color::from_rgb(1.0, 0.8, 0.44),   // Orange Ayu
                 accent: Color::from_rgb(0.36, 0.74, 0.85), // Bleu Ayu
                 surface: Color::from_rgb(0.14, 0.17, 0.23),
@@ -202,29 +203,29 @@ impl Default for TerminalColors {
 pub enum ButtonVariant {
     Primary,
     Secondary,
-    Danger, // Optionnel : pour le bouton "Supprimer"
+    Danger, // Optionnal for destructive actions
 }
 
 
-// --- FONCTIONS DE STYLE ---
+// --- STYLE FUNCTIONS ---
 
 pub fn button_style(
     colors: TerminalColors,
     status: button::Status,
     variant: ButtonVariant,
 ) -> button::Style {
-    // 1. On définit les couleurs selon la variante
+
     let (bg_base, txt_color) = match variant {
         ButtonVariant::Primary => (colors.accent, colors.bg),
         ButtonVariant::Secondary => (colors.surface, colors.text),
         ButtonVariant::Danger => (Color::from_rgb(0.8, 0.2, 0.2), Color::WHITE),
     };
 
-    // 2. On ajuste l'intensité selon l'état (Survol / Clic)
+    // ajustment following the status (hovered, pressed, default) with a more subtle approach
     let final_bg = match status {
         button::Status::Hovered => Color { a: 1.0, ..bg_base },
         button::Status::Pressed => Color { a: 0.7, ..bg_base },
-        _ => Color { a: 0.85, ..bg_base }, // Un peu plus doux au repos
+        _ => Color { a: 0.85, ..bg_base }, // Default state with a slight transparency for a softer look
     };
 
     button::Style {

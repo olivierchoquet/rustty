@@ -14,15 +14,14 @@ use russh::{
 };
 use tokio::sync::Mutex;
 
+// Alias for the SSH channel type, simplifying references throughout the code
 pub type SshChannel = russh::Channel<russh::client::Msg>;
-// Alias pour le canal partagé entre les threads et l'UI
+// Using Arc and Mutex to allow shared ownership and mutable access across async tasks and threads
 pub type SshChannelArc = std::sync::Arc<tokio::sync::Mutex<SshChannel>>;
-
-// Alias pour simplifier la signature du Handle SSH
+// Alias for the SSH handle, which manages the connection and channels. Wrapped in Arc and Mutex for safe concurrent access.
 pub type SshHandle = std::sync::Arc<tokio::sync::Mutex<russh::client::Handle<MyHandler>>>;
 
 pub struct MyHandler {
-    //pub window_id: iced::window::Id,
     pub window_id: Arc<Mutex<Option<iced::window::Id>>>,
     pub sender: mpsc::Sender<Message>,
 }
@@ -54,14 +53,14 @@ impl client::Handler for MyHandler {
 pub struct SshService;
 
 impl SshService {
-    /// Crée la tâche de connexion
+
     pub fn connect(profile_ip: String, port: u16, user: String, pass: String) -> Task<Message> {
         Task::stream(iced::stream::channel(100, move |mut output| async move {
-            let config = Arc::new(client::Config::default()); // On crée le container vide pour l'ID
+            let config = Arc::new(client::Config::default()); 
             let window_id_container = Arc::new(Mutex::new(None));
             let handler = MyHandler {
                 sender: output.clone(),
-                window_id: window_id_container.clone(), // On partage le pointeur
+                window_id: window_id_container.clone(), 
             };
 
             match client::connect(config, (profile_ip.as_str(), port), handler).await {
@@ -71,12 +70,10 @@ impl SshService {
                         .await
                         .unwrap_or(false)
                     {
-                        // C'est ici que ça devient malin :
-                        // On envoie le handle à l'UI pour qu'elle puisse ouvrir les fenêtres
                         let _ = output
                             .send(Message::Ssh(SshMessage::Connected(Ok((
                                 Arc::new(Mutex::new(handle)),
-                                window_id_container, // On envoie aussi le container !
+                                window_id_container, 
                             )))))
                             .await;
                     } else {
@@ -98,7 +95,6 @@ impl SshService {
         }))
     }
 
-    // Dans src/ssh.rs
 
     pub fn open_shell(
         window_id: iced::window::Id,
@@ -109,14 +105,15 @@ impl SshService {
 
         Task::perform(
             async move {
-                // 1. On met à jour l'ID via l'Arc partagé directement !
+                // 1. update the shared window ID directly via the Arc! 
+                // This ensures that when the SSH handler receives data, it knows which window to send it to.
                 {
                     let mut w_id_lock = shared_window_id.lock().await;
                     *w_id_lock = Some(window_id);
                     println!("LOG: ID partagé mis à jour pour {:?}", window_id);
                 }
 
-                // 2. On ouvre la session normalement
+                // 2. Now we can open the SSH session and channel as before, knowing that the handler has the correct window ID to work with.
                 let mut ch = {
                     let mut h_lock = handle.lock().await;
                     h_lock.channel_open_session().await.ok()?

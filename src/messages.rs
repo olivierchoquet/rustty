@@ -1,12 +1,11 @@
 use std::sync::Arc;
 use iced::{window, Event};
 use crate::{models::EditSection, ssh::{MyHandler, SshChannel, SshHandle}, ui::theme::ThemeChoice};
-// Importation de Mutex asynchrone de tokio
 use tokio::sync::Mutex;
 
-#[derive(Clone, Debug)] // On simplifie le Debug pour l'instant
+#[derive(Clone, Debug)] 
 pub enum Message {
-    // --- Système & Fenêtres ---
+    // --- System & Windows ---
     Event(Event),
     //KeyboardEvent(iced::keyboard::Event),
     WindowOpened(window::Id),
@@ -14,11 +13,11 @@ pub enum Message {
     QuitRequested,
     DoNothing,
 
-    // --- Sous-domaines (Découpage par thématique) ---
-    Login(LoginMessage),     // Tout ce qui touche aux champs de saisie
-    Ssh(SshMessage),         // Tout ce qui touche au réseau/terminal
-    Profile(ProfileMessage), // Tout ce qui touche à la base de données de profils
-    Config(ConfigMessage),   // Thèmes, sections, réglages
+    // --- Sub-domain (Breakdown by topic) ---
+    Login(LoginMessage),     // Everything related to input fields
+    Ssh(SshMessage),         // Everything related to the network/terminal
+    Profile(ProfileMessage), // Everything related to the profiles database
+    Config(ConfigMessage),   // Themes, sections, settings
 }
 
 #[derive(Clone, Debug)]
@@ -27,27 +26,18 @@ pub enum LoginMessage {
     InputPort(String),
     InputUsername(String),
     InputPass(String),
-    Submit, // Ancien ButtonConnection
+    Submit, 
 }
 
 #[derive(Clone)]
 pub enum SshMessage {
     Connected(Result<(crate::ssh::SshHandle, Arc<Mutex<Option<iced::window::Id>>>), String>),
-    //Connected(Result<Arc<Mutex<russh::client::Handle<MyHandler>>>, String>),
-   // SetChannel(Arc<Mutex<SshChannel>>),
-   // DataReceived(Vec<u8>),  // Ancien SshData
-    SendData(Vec<u8>),      // Ancien SendSshRaw ou RawKey
-    //TerminalWindowOpened(window::Id),
-    //TerminalWindowOpened(iced::window::Id, crate::ssh::SshHandle),
+    SendData(Vec<u8>),   
     TerminalWindowOpened(window::Id, SshHandle, Arc<Mutex<Option<window::Id>>>),
-
-    // Ajout de l'ID ici pour savoir quel canal appartient à quelle fenêtre
     SetChannel(iced::window::Id, crate::ssh::SshChannelArc), 
-    // Ajout de l'ID ici pour savoir quelle fenêtre mettre à jour
     DataReceived(iced::window::Id, Vec<u8>),
     WindowFocused(iced::window::Id),
 }
-    // Ajout de l'ID ici pour savoir quel canal appartient à quell
 
 #[derive(Clone, Debug)]
 pub enum ProfileMessage {
@@ -73,7 +63,7 @@ impl std::fmt::Debug for SshMessage {
         match self {
             SshMessage::Connected(Ok(_)) => f.debug_tuple("Connected").field(&"Ok(SSH_HANDLE)").finish(),
             SshMessage::Connected(Err(e)) => f.debug_tuple("Connected").field(&format!("Err({})", e)).finish(),
-            // Pour les autres variantes simples, on peut utiliser le nom
+            // For other variants, we can just print their names without the full content for brevity
             _ => f.write_str("OtherSshMessage"), 
         }
     }

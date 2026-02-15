@@ -1,6 +1,5 @@
 use std::path::Path;
 
-// src/models.rs
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use crate::ui::theme::ThemeChoice;
@@ -39,7 +38,7 @@ impl Profile {
         }
     }
 
-    /// Charge tous les profils depuis le disque
+    /// Load all profiles from the JSON file, returning an empty vector if the file doesn't exist or is invalid
     pub fn load_all() -> Vec<Self> {
         if !Path::new(Self::FILE_PATH).exists() {
             return Vec::new();
@@ -54,7 +53,7 @@ impl Profile {
         }
     }
 
-    /// Sauvegarde une liste complète de profils
+    /// SAve all profiles to the JSON file, overwriting existing content. Logs an error if writing fails.
     pub fn save_all(profiles: &[Self]) {
         if let Ok(json) = serde_json::to_string_pretty(profiles) {
             if let Err(e) = std::fs::write(Self::FILE_PATH, json) {
