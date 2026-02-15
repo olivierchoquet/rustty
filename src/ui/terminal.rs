@@ -200,6 +200,7 @@ fn render_text_chunk(
     text(txt)
         .font(iced::Font::MONOSPACE)
         .size(15)
+        .line_height(1.0)
         .color(vt_to_iced_color(vt_color, &colors))
         .into()
 }
@@ -216,8 +217,10 @@ fn render_cursor(
         text(char_str)
             .font(iced::Font::MONOSPACE)
             .size(15)
+            .line_height(1.0)
             .color(cursor_fg),
     )
+    .padding(0)
     .style(move |_| container::Style {
         background: Some(cursor_bg.into()),
         ..Default::default()

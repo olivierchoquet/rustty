@@ -50,7 +50,7 @@ pub struct MyApp {
     pub parsers: HashMap<window::Id, vt100::Parser>,
     // each ssh channel by terminal window
     pub active_channels: HashMap<window::Id, Arc<Mutex<SshChannel>>>,
-    pub focus_index: usize,           // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
+    pub focus_index: usize, // 0 = IP, 1 = PORT, 2 = USER, 3 = PASS
     // Gestion des profils
     pub current_profile: Profile, // Le "brouillon" lié aux inputs
     pub selected_profile_id: Option<uuid::Uuid>, // L'ID du profil qu'on est en train d'éditer
@@ -182,8 +182,8 @@ impl MyApp {
             ProfileMessage::InputGroup(group) => self.current_profile.group = group,
             ProfileMessage::SearchChanged(query) => self.search_query = query,
             ProfileMessage::TerminalCountChanged(new_count) => {
-                // On contraint la valeur entre 1 et 5
-                self.current_profile.terminal_count = new_count.clamp(1, 5);
+                // On contraint la valeur entre 1 et 4 pour éviter les configurations extrêmes
+                self.current_profile.terminal_count = new_count.clamp(1, 4);
             }
 
             ProfileMessage::Save => {
@@ -308,29 +308,25 @@ impl MyApp {
             // 1. Connexion réussie : on récupère le handle ET le contrôleur d'ID
             // 1. UNE connexion a réussi
             SshMessage::Connected(Ok((handle, id_controller))) => {
-                // On prépare les réglages de la fenêtre (tu peux gérer la position ici)
-                // Configuration de la grille
-                let win_w = 800.0;
-                let win_h = 700.0;
-                let gap = 15.0;
-                let max_cols = 2; // On passe à la ligne après 2 fenêtres
-                let margin_x = 100.0;
-                let margin_y = 50.0;
+                let win_w = 850.0;
+                let win_h = 550.0;
 
-                // Calcul basé sur l'index actuel
-                let col = (self.current_window_index % max_cols) as f32;
-                let row = (self.current_window_index / max_cols) as f32;
+                // --- NOUVEAUX RÉGLAGES D'ESPACEMENT ---
+                let gap_x = 15.0; // Espace horizontal (côte à côte)
+                let gap_y = 45.0; // Espace vertical (haut/bas) - On l'augmente ici
+                let margin_x = 40.0;
+                let margin_y = 30.0;
+                // --------------------------------------
 
-                let x = margin_x + (col * (win_w + gap));
-                let y = margin_y + (row * (win_h + gap));
+                // Calcul de la grille 2x2
+                let col = (self.current_window_index % 2) as f32;
+                let row = (self.current_window_index / 2) as f32;
 
-                // On incrémente pour la fenêtre suivante
+                // Utilisation des gaps distincts pour X et Y
+                let x = margin_x + (col * (win_w + gap_x));
+                let y = margin_y + (row * (win_h + gap_y));
+
                 self.current_window_index += 1;
-
-                let settings = window::Settings {
-                    size: (900.0, 600.0).into(),
-                    ..Default::default()
-                };
 
                 let settings = window::Settings {
                     size: (win_w, win_h).into(),
@@ -354,7 +350,12 @@ impl MyApp {
             SshMessage::TerminalWindowOpened(id, handle, id_controller) => {
                 self.terminal_window_ids.push(id);
 
-                let parser = vt100::Parser::new(24, 80, MAX_TERMINAL_LINES);
+                // Calcul approximatif : 1 ligne occupe environ 18-20 pixels en hauteur
+                // 1 caractère occupe environ 9-10 pixels en largeur
+                let rows = 28; // Valeur sûre pour la moitié d'un écran 1080p
+                let cols = 100;
+
+                let parser = vt100::Parser::new(rows, cols, MAX_TERMINAL_LINES);
                 self.parsers.insert(id, parser);
 
                 // On lance le shell avec le contrôleur dédié à cette session
@@ -367,7 +368,15 @@ impl MyApp {
                 if let Some(parser) = self.parsers.get_mut(&id) {
                     parser.process(&raw_bytes);
                 }
-                Task::none()
+                // --- AJOUT POUR LE SCROLL AUTOMATIQUE ---
+                // On génère l'identifiant du scrollable pour cette fenêtre spécifique
+                let scroll_id = scrollable::Id::new(format!("scroll_{:?}", id));
+    
+                // On retourne une tâche qui force le scroll vers le bas (0.0 = top, 1.0 = bottom)
+                scrollable::snap_to(scroll_id, scrollable::RelativeOffset::END)
+
+
+                //Task::none()
             }
 
             // 4. Stockage du canal actif pour l'envoi de touches

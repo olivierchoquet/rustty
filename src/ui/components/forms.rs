@@ -152,7 +152,7 @@ pub fn terminal_count_selector<'a>(current_count: usize, colors: TerminalColors)
                 .align_y(Vertical::Center)
         )
         .on_press(Message::Profile(ProfileMessage::TerminalCountChanged(
-            current_count.saturating_sub(1)
+            current_count.saturating_sub(1).max(1) // On s'assure que ça ne descend pas en dessous de 1
         )))
         .width(35),
 
@@ -172,7 +172,7 @@ pub fn terminal_count_selector<'a>(current_count: usize, colors: TerminalColors)
                 .align_y(Vertical::Center)
         )
         .on_press(Message::Profile(ProfileMessage::TerminalCountChanged(
-            current_count.saturating_add(1)
+            current_count.saturating_add(1).min(4) // On s'assure que ça ne monte pas au-dessus de 4
         )))
         .width(35),
     ]
