@@ -7,8 +7,9 @@ use iced::{Alignment, Element, Length};
 pub fn buttons_form<'a>(colors: TerminalColors, is_editing: bool) -> Element<'a, Message> {
     let texte_bouton = if is_editing { "Mettre à jour" } else { "Ajouter" };
     
-    // Copies pour les closures - style move consomme la copie - prend la propriété exclusive
-    // On peut éviter ceci  par #
+    // Copies for closures - move style consumes the copy - takes exclusive ownership
+    // This can be avoided with #[derive(Clone)] on TerminalColors and using .clone() 
+    // here, but for simplicity we just create multiple copies
     let c1 = colors;
     let c2 = colors;
     let c3 = colors;

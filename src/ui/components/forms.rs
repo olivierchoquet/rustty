@@ -24,8 +24,6 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                //Message::Profile(ProfileMessage::InputName),
-                // On crée une closure qui prend la chaîne 's' et l'emballe
                 |s| Message::Profile(ProfileMessage::InputName(s)),
                 None,
             ),
@@ -49,7 +47,6 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                //Message::InputIP,
                 |s| Message::Login(LoginMessage::InputIP(s)),
                 None
             ),
@@ -60,7 +57,6 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                //Message::InputPort,
                 |s| Message::Login(LoginMessage::InputPort(s)),
                 None
             ),
@@ -74,7 +70,6 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
                 colors,
                 None,
                 false,
-                //Message::InputUsername,
                 |s| Message::Login(LoginMessage::InputUsername(s)),
                 None,
             ),
@@ -92,7 +87,6 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
         .spacing(10),
         column![
             text("OPTIONS DE SESSION").size(12).color(colors.accent),
-            // On passe colors directement (par valeur/copie)
             terminal_count_selector(app.current_profile.terminal_count, colors),
         ]
         .spacing(8),
@@ -104,20 +98,19 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
 fn render_input_with_label<'a>(
     label: &'a str,
     value: &'a str,
-    id: text_input::Id, // On peut utiliser l'ID pour associer le label à l'input si besoin
-    colors: TerminalColors, // On va s'en servir !
+    id: text_input::Id, // ID for focus management
+    colors: TerminalColors,
     helper_text: Option<&'a str>,
     is_secure: bool,
     msg: impl Fn(String) -> Message + 'a,
     on_submit_message: Option<Message>,
 ) -> Element<'a, Message> {
     let mut col = column![
-        // 1. Label utilisant la couleur de texte de ton thème (atténuée)
+        // label
         text(label).size(13).style(move |_| text::Style {
-            // On utilise la couleur d'accent ou de texte de ton struct
             color: Some(colors.text.into())
         }),
-        // 2. Input
+        // input
         text_input(label, value)
             .id(id)
             .on_input(msg)
@@ -126,53 +119,48 @@ fn render_input_with_label<'a>(
             .on_submit(on_submit_message.unwrap_or(Message::DoNothing)),
     ]
     .spacing(5)
-    .width(Length::Fill) // Prend toute la largeur dispo
-    .height(Length::Shrink); // Ne prend QUE la hauteur nécessaire
+    .width(Length::Fill)
+    .height(Length::Shrink);
 
-    // 3. Helper Text utilisant une couleur d'alerte du thème
+    // optional text helper below the input (e.g., for password warning)
     if let Some(help) = helper_text {
         col = col.push(text(help).size(11).style(move |_| text::Style {
-            color: Some(colors.prompt.into()), // On utilise 'prompt' pour l'alerte
+            color: Some(colors.prompt.into()),
         }));
     }
 
     col.into()
 }
 
-pub fn terminal_count_selector<'a>(current_count: usize, colors: TerminalColors) -> Element<'a, Message> {
+pub fn terminal_count_selector<'a>(
+    current_count: usize,
+    colors: TerminalColors,
+) -> Element<'a, Message> {
     row![
         text("Nombre de fenêtres :")
             .width(Length::Fill)
-            .color(colors.text), 
-        
-        // Bouton Moins
+            .color(colors.text),
         button(
             text("-")
                 .align_x(Horizontal::Center)
                 .align_y(Vertical::Center)
         )
         .on_press(Message::Profile(ProfileMessage::TerminalCountChanged(
-            current_count.saturating_sub(1).max(1) // On s'assure que ça ne descend pas en dessous de 1
+            current_count.saturating_sub(1).max(1)
         )))
         .width(35),
 
-        // Valeur actuelle centrée
-        container(
-            text(current_count.to_string())
-                .color(colors.text)
-                .size(18)
-        )
-        .width(40)
-        .align_x(Horizontal::Center),
+        container(text(current_count.to_string()).color(colors.text).size(18))
+            .width(40)
+            .align_x(Horizontal::Center),
 
-        // Bouton Plus
         button(
             text("+")
                 .align_x(Horizontal::Center)
                 .align_y(Vertical::Center)
         )
         .on_press(Message::Profile(ProfileMessage::TerminalCountChanged(
-            current_count.saturating_add(1).min(4) // On s'assure que ça ne monte pas au-dessus de 4
+            current_count.saturating_add(1).min(4) // max 4 windows
         )))
         .width(35),
     ]
@@ -209,7 +197,6 @@ pub fn terminal_count_selector<'a>(current_count: usize, colors: TerminalColors)
 pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Message> {
     let mut themes_list = column![].spacing(10);
 
-    // On crée des lignes de 3 thèmes pour ne pas avoir une liste infinie
     let mut row_items = row![].spacing(10);
 
     for (i, theme) in ThemeChoice::ALL.iter().enumerate() {
@@ -223,7 +210,7 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
                         weight: iced::font::Weight::Bold,
                         ..iced::Font::DEFAULT
                     }),
-                    // Petite prévisualisation des couleurs du thème
+                    // Preview of the theme colors
                     row![
                         container(text("")).width(15).height(15).style(move |_| {
                             container::Style {
@@ -271,7 +258,6 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
 
         row_items = row_items.push(theme_button);
 
-        // Toutes les 3 vignettes, on crée une nouvelle ligne
         if (i + 1) % 3 == 0 || (i + 1) == ThemeChoice::ALL.len() {
             themes_list = themes_list.push(row_items);
             row_items = row![].spacing(10);

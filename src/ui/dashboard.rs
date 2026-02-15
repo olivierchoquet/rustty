@@ -7,16 +7,12 @@ use iced::{
 use crate::{messages::{ConfigMessage, LoginMessage, Message, ProfileMessage}, ui::{EditSection, MyApp, Profile, components::{forms::{general_form, theme_form}, search_table::{content, header}}, theme}};
 use crate::ui::components::{actions_bar, sidebar};
 
-//use crate::ui::constants::*;
-
-
 pub fn render(app: &MyApp) -> Element<'_, Message> {
     let colors = app.current_profile.theme.get_colors();
 
-    // 1. Appel du composant Sidebar
     let side_menu = sidebar::render(app.active_section, colors);
 
-    // 2. LOGO "RustTy"
+    // LOGO "RustTy"
     let brand_header = column![
         row![
             text("Rust").size(35).font(iced::Font {
@@ -33,24 +29,21 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
             .color(Color {
                 a: 0.7,
                 ..colors.prompt
-            }) // On baisse l'opacité pour donner un style "secondaire"
+            }) 
             .font(Font {
-                weight: Weight::Light, // Ou Weight::Normal si Light n'est pas dispo
+                weight: Weight::Light, 
                 ..Font::DEFAULT
             }),
     ]
     .spacing(2);
 
-    // 3. CONTENU DYNAMIQUE (SELON L'ONGLET) ---
+    // dynamic content based on active section
     let dynamic_content: Element<_> = match app.active_section {
         EditSection::General => {
             column![
-                // L'onglet Général appelle le header (qui contient maintenant la recherche)
                 header(app, colors),
-                // Le contenu du tableau (les lignes)
                 content(app, colors),
                 horizontal_rule(1),
-                // Le formulaire
                 general_form(app, colors),
             ]
             .spacing(20)
@@ -70,9 +63,9 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
             .into(),
     };
 
-    // 4. Barre d'actions commune à tous les onglets (Sauvegarder, Supprimer, Démarrer, Quitter)
+    // actions bar (Save, Start SSH, ...)
     let actions_bar = actions_bar::buttons_form(colors, app.selected_profile_id.is_some());
-    // 5. ASSEMBLAGE FINAL ---
+    // FINAL ASSEMBLY
     column![
         row![
             side_menu,

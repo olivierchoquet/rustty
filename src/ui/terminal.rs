@@ -3,7 +3,7 @@ use std::os::linux::raw;
 use crate::messages::{ConfigMessage, SshMessage};
 use crate::ui::theme::{self, TerminalColors, ThemeChoice};
 use crate::ui::{
-    ID_IP, ID_PASS, ID_PORT, ID_USER, MAX_TERMINAL_LINES, Message, MyApp, SCROLLABLE_ID,
+    ID_IP, ID_PASS, ID_PORT, ID_USER, MAX_TERMINAL_LINES, Message, MyApp,
 };
 
 use iced::keyboard::key::Named;
@@ -15,9 +15,6 @@ use vt100;
 pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> {
     let colors = app.current_profile.theme.get_colors();
 
-// --- CHANGEMENT ICI ---
-    // On va chercher le parser spécifique à cette fenêtre.pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> {
-    // Si on ne le trouve pas, on affiche un message d'attente.
     let Some(parser) = app.parsers.get(&window_id) else {
         return container(text("Connexion en cours...").color(colors.text))
             .center_x(Length::Fill)
@@ -33,12 +30,11 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
     let (rows, cols) = screen.size();
     let (cursor_row, cursor_col) = screen.cursor_position();
 
-    // On pré-clône les couleurs pour les closures de la barre d'onglets et d'état
     let tab_colors = colors.clone();
     let status_colors = colors.clone();
     let bg_color_final = colors.bg;
 
-    // --- 1. BARRE D'ONGLETS (Header) ---
+    // --- 1. TAB ZONE ---
     let tab_bar = container(
         row![
             container(
@@ -81,7 +77,7 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
         ..Default::default()
     });
 
-    // --- 2. ZONE TERMINAL ---
+    // --- 2. TERMINAL ZONE ---
     let terminal_content = column(
         (0..rows)
             .map(|row_idx| {
@@ -102,7 +98,7 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
                         };
 
                         if (fg != current_fg || is_cursor) && !current_text.is_empty() {
-                            // On passe colors par valeur (cloné)
+
                             line_elements.push(render_text_chunk(
                                 current_text.clone(),
                                 current_fg,
@@ -144,18 +140,15 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
                 ..Default::default()
             }),
     )
-    //.id(scrollable::Id::new(SCROLLABLE_ID))
     .id(scrollable::Id::new(format!("scroll_{:?}", window_id)))
     .height(Length::Fill);
 
-    // --- AJOUT DU FOCUS AU CLIC ---
-    // On enveloppe le scrollable dans un bouton transparent qui couvre toute la zone
     let interactive_terminal = button(terminal_scroll)
     .padding(0)
     .style(iced::widget::button::secondary) // Ou un style transparent personnalisé
     .on_press(Message::Ssh(SshMessage::WindowFocused(window_id)));
 
-    // --- 3. BARRE D'ÉTAT (Footer) ---
+    // --- 3. STATE BAR (Footer) ---
     let status_bar = container(
         row![
             container(
@@ -233,10 +226,9 @@ fn vt_to_iced_color(
     theme_colors: &crate::ui::theme::TerminalColors,
 ) -> iced::Color {
     match vt_color {
-        vt100::Color::Default => theme_colors.text, // Utilise la couleur de ton thème
-        //vt100::Color::Default => iced::Color::from_rgb8(255, 255, 255),
+        vt100::Color::Default => theme_colors.text, 
         vt100::Color::Idx(i) => {
-            // Conversion basique des 16 premières couleurs ANSI
+
             match i {
                 0 => iced::Color::from_rgb8(0, 0, 0),       // Black
                 1 => iced::Color::from_rgb8(205, 0, 0),     // Red

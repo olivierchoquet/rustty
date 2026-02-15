@@ -50,10 +50,7 @@ fn nav_button<'a>(
         .on_press(Message::Config(ConfigMessage::SectionChanged(section)))
         .padding(10)
         .style(move |_, status| {
-            // 1. On récupère le style de base
             let mut s = theme::button_style(colors, status,theme::ButtonVariant::Secondary);
-
-            // 2. ON ÉCRASE SYSTÉMATIQUEMENT SI ACTIF
             if is_active {
                 s.background = Some(colors.accent.into());
                 s.text_color = iced::Color::BLACK;
@@ -63,7 +60,6 @@ fn nav_button<'a>(
                     radius: 5.0.into(),
                 };
             } else {
-                // Optionnel: on peut aussi forcer le style inactif ici
                 s.background = Some(colors.surface.into());
                 s.text_color = iced::Color::WHITE;
             }

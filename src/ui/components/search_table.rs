@@ -6,7 +6,7 @@ use iced::{Element, Font, Length, font};
 
 pub fn header<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     column![
-        // Barre de recherche
+
         text_input("🔍 Recherche rapide sur nom, groupe, ip, utilisateur", &app.search_query)
             .on_input(|v| Message::Profile(ProfileMessage::SearchChanged(v)))
             .padding(10)
@@ -14,9 +14,6 @@ pub fn header<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message
                 theme::input_style(colors, status)
             }),
 
-        // --- ESPACE ICI ---
-        
-        // Ligne des titres
         container(
             row![
                 bold_text("GROUPE").width(Length::FillPortion(1)),
@@ -35,12 +32,12 @@ pub fn header<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message
             }
         })
     ]
-    .spacing(20) // <--- Augmente cette valeur pour plus d'espace sous la recherche
+    .spacing(20) 
     .into()
 }
 
-// On ajoute &'a avant MyApp pour dire :
-// "L'app doit vivre au moins aussi longtemps que l'élément UI produit"
+// <'a> means that provided MyApp reference 
+// must live at least as long as the produced UI element.
 pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     let mut content = column![].spacing(1);
     let query = app.search_query.to_lowercase();
@@ -48,9 +45,9 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
     for (i, profile) in app.profiles.iter().enumerate() {
         let is_match = query.is_empty() 
             || profile.name.to_lowercase().contains(&query) 
-            || profile.group.to_lowercase().contains(&query) // Recherche par Groupe
-            || profile.ip.contains(&query)          // Recherche par IP
-            || profile.username.to_lowercase().contains(&query); // Recherche par Nom d'utilisateur
+            || profile.group.to_lowercase().contains(&query) 
+            || profile.ip.contains(&query)          
+            || profile.username.to_lowercase().contains(&query); 
         if is_match {
             let is_selected = app.selected_profile_id == Some(profile.id);
             let zebra_color = if i % 2 == 0 {
@@ -58,8 +55,6 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
             } else {
                 colors.bg
             };
-
-            // On utilise .push(...) normalement
             content = content.push(
                 button(
                     container(
@@ -81,11 +76,9 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
                     if is_selected {
                         st.background = Some(colors.prompt.into());
                         st.text_color = colors.accent;
-                        // AJOUT : Une bordure pour bien marquer le coup
                         st.border.width = 2.0;
                         st.border.color = colors.accent;
                     } else {
-                        // MAJ : Couleur zébrée pour les lignes non sélectionnées
                         st.background = Some(zebra_color.into());
                         st.text_color = colors.text;
                         st.border.width = 0.0;
@@ -95,13 +88,11 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
             );
         }
     }
-
-    // Maintenant .into() fonctionnera car les durées de vie sont liées
     scrollable(content).height(Length::Fixed(150.0)).into()
 }
 
 
-// Fonction utilitaire pour créer un texte en gras
+// helper for bold text in the header
 fn bold_text(content: &str) -> text::Text {
     text(content).font(Font {
         weight: font::Weight::Bold,

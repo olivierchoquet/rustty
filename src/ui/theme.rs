@@ -208,7 +208,6 @@ pub enum ButtonVariant {
 
 // --- FONCTIONS DE STYLE ---
 
-
 pub fn button_style(
     colors: TerminalColors,
     status: button::Status,
