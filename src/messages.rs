@@ -7,6 +7,7 @@ use tokio::sync::Mutex;
 pub enum Message {
     // --- System & Windows ---
     Event(Event),
+    LogReceived(String),     // For logging SSH events and errors
     //KeyboardEvent(iced::keyboard::Event),
     WindowOpened(window::Id),
     WindowClosed(window::Id),

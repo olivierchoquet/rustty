@@ -1,4 +1,3 @@
-//use iced::futures::SinkExt;
 use iced::keyboard::key::Named;
 use iced::keyboard::{Key, Modifiers};
 use iced::widget::{scrollable, text_input};
@@ -6,6 +5,7 @@ use iced::{Element, Task, window};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc;
 
 // Internal module imports
 use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage, SshMessage};
@@ -57,6 +57,10 @@ pub struct MyApp {
     pub active_section: EditSection,
     /// Focus for TextInput in the login form (IP, Port, User, Pass)
     pub focused_id: &'static str,
+
+    // --- Logger ---
+    pub logs: Vec<String>,
+    pub log_receiver: Option<mpsc::UnboundedReceiver<String>>,
 }
 
 impl MyApp {
@@ -81,11 +85,15 @@ impl MyApp {
             active_section: EditSection::General,
             focused_id: ID_PROFILE,
             ssh_handle: None,
+            logs: Vec::new(),
+            log_receiver: None,
         }
     }
 
     // router message
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        // println!("Message reçu par l'app : {:?}", message);
+        // log::info!("Test");
         match message {
             Message::Login(msg) => self.handle_login_msg(msg),
             Message::Profile(msg) => self.handle_profile_msg(msg),
@@ -102,6 +110,18 @@ impl MyApp {
                 Task::none()
             }
             Message::WindowClosed(id) => self.handle_window_closed(id),
+
+            Message::LogReceived(content) => {
+                println!("LOG RECEIVED: {}", content); // Affiche le log dans la console pour debug
+                // On insère à l'index 0 (le haut de la liste)
+                self.logs.insert(0, content);
+
+                // On limite la taille pour ne pas saturer la RAM
+                if self.logs.len() > 100 {
+                    self.logs.pop(); // Supprime le plus vieux (à la fin)
+                }
+                Task::none()
+            }
 
             _ => Task::none(),
         }
@@ -187,6 +207,16 @@ impl MyApp {
 
                 // 2. Appel au service SSH (on utilise ce que tu as déjà écrit)
                 println!("LOG: Connexion vers {}...", self.current_profile.ip);
+                log::info!(
+                    "Tentative de connexion à {}@{}:{}",
+                    self.current_profile.username,
+                    self.current_profile.ip,
+                    self.current_profile.port
+                );
+
+                let msg = format!("Tentative de connexion à {}", self.current_profile.ip);
+log::info!("{}", msg); // Pour le fichier
+self.logs.insert(0, msg); // Injection DIRECTE dans l'état de l'app
 
                 let count = self.current_profile.terminal_count.max(1);
                 let mut tasks = Vec::new();
@@ -265,7 +295,7 @@ impl MyApp {
                 self.terminal_window_ids.push(id);
 
                 // default size for the VT100 parser, it will adapt to the actual window size later when we receive the first data chunk
-                let rows = 28; 
+                let rows = 28;
                 let cols = 100;
 
                 let parser = vt100::Parser::new(rows, cols, MAX_TERMINAL_LINES);
@@ -283,7 +313,6 @@ impl MyApp {
                 // auto scroll to bottom on new data
                 let scroll_id = scrollable::Id::new(format!("scroll_{:?}", id));
                 scrollable::snap_to(scroll_id, scrollable::RelativeOffset::END)
-
             }
 
             // store the active channel for this window to be able to send data back later
@@ -420,7 +449,7 @@ impl MyApp {
 // pure function no self needed
 fn map_key_to_ssh(key: &Key, mods: Modifiers) -> Option<Vec<u8>> {
     // shortcut keyboard combinations with Control (e.g., Ctrl+C, Ctrl+D, etc.)
-    // control key is pressed ? 
+    // control key is pressed ?
     if mods.control() {
         if let Key::Character(c) = key {
             let b = c.as_bytes();
