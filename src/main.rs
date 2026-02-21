@@ -12,37 +12,41 @@ pub fn main() -> iced::Result {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let rx_cell = std::sync::Arc::new(std::sync::Mutex::new(Some(rx)));
 
-    // 2. Configuration de FERN
-    let dispatch = fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
+    // 1. On définit le Dispatcher de base (le tronc commun)
+    let base_config = fern::Dispatch::new().format(|out, message, record| {
+        out.finish(format_args!(
+            "{}[{}][{}] {}",
+            chrono::Local::now().format("[%H:%M:%S]"),
+            record.target(),
+            record.level(),
+            message
+        ))
+    });
+
+    // 2. Configuration pour le FICHIER et la CONSOLE (On veut tout)
+    let file_and_console_config = fern::Dispatch::new()
         .level(log::LevelFilter::Info)
-        // On réduit le bruit des bibliothèques gourmandes
         .level_for("zbus", log::LevelFilter::Warn)
         .level_for("wgpu", log::LevelFilter::Warn)
-        .level_for("naga", log::LevelFilter::Warn);
+        .chain(std::io::stdout())
+        .chain(fern::log_file("logs/terminal_app.log").expect("Erreur fichier log"));
 
-    // On crée les destinations (Chains)
-    dispatch
-        .chain(std::io::stdout()) // Dans ton terminal VSCode
-        .chain(fern::log_file("logs/terminal_app.log").expect("Erreur fichier log")) // Dans le fichier
+    // 3. Configuration pour l'UI (UNIQUEMENT ton appli)
+    let ui_config = fern::Dispatch::new()
+        // On ne laisse passer QUE ce qui commence par le nom de ton crate (rustty)
+        .filter(|metadata| metadata.target().starts_with("rustty"))
+        .level(log::LevelFilter::Info)
         .chain(fern::Output::call(move |record| {
-            // ICI : On envoie chaque log directement dans le tuyau de l'UI
-            let _ = tx.send(format!("{}", record.args()));
-        }))
+            let msg = format!("[{}] {}", record.level(), record.args());
+            let _ = tx.send(msg);
+        }));
+
+    // 4. On lie tout ensemble
+    base_config
+        .chain(file_and_console_config)
+        .chain(ui_config)
         .apply()
         .expect("Erreur initialisation Fern");
-
-    log::info!("Système de log Fern opérationnel");
-
-    log::info!("Système de log initialisé au démarrage");
     // idec daemon to manage multiple windows and global events
     iced::daemon("RustTy", MyApp::update, MyApp::view)
         //By writing |_|,

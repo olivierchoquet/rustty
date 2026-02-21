@@ -215,8 +215,8 @@ impl MyApp {
                 );
 
                 let msg = format!("Tentative de connexion à {}", self.current_profile.ip);
-log::info!("{}", msg); // Pour le fichier
-self.logs.insert(0, msg); // Injection DIRECTE dans l'état de l'app
+                log::info!("{}", msg); // Pour le fichier
+                self.logs.insert(0, msg); // Injection DIRECTE dans l'état de l'app
 
                 let count = self.current_profile.terminal_count.max(1);
                 let mut tasks = Vec::new();
