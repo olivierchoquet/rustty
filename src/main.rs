@@ -1,46 +1,46 @@
-pub mod logger;
 pub mod messages;
 pub mod models;
 pub mod ssh;
 pub mod ui;
 
-use flexi_logger::{FileSpec, Logger, WriteMode};
 use iced::{Task, futures::SinkExt, widget::text_input, window};
 use messages::Message;
 use ui::{MyApp, constants::*};
 
 pub fn main() -> iced::Result {
-    // 1. Créer le canal DEHORS
+    // 1. Ton canal MPSC habituel
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    // On enveloppe rx dans un Mutex pour pouvoir l'extraire de la closure Fn
     let rx_cell = std::sync::Arc::new(std::sync::Mutex::new(Some(rx)));
 
-    // Create the log directory if it doesn't exist to prevent panics
-    std::fs::create_dir_all("logs").expect("Failed to create logs directory");
+    // 2. Configuration de FERN
+    let dispatch = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{}[{}][{}] {}",
+                chrono::Local::now().format("[%H:%M:%S]"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .level(log::LevelFilter::Info)
+        // On réduit le bruit des bibliothèques gourmandes
+        .level_for("zbus", log::LevelFilter::Warn)
+        .level_for("wgpu", log::LevelFilter::Warn)
+        .level_for("naga", log::LevelFilter::Warn);
 
-    // 2. Initialiser le Logger UNE SEULE FOIS au début
-    // Remplace "info" par ce filtre plus sélectif :
-// 1. Créer le writer
-    let dashboard_writer = Box::new(crate::logger::DashboardWriter::new(tx));
+    // On crée les destinations (Chains)
+    dispatch
+        .chain(std::io::stdout()) // Dans ton terminal VSCode
+        .chain(fern::log_file("logs/terminal_app.log").expect("Erreur fichier log")) // Dans le fichier
+        .chain(fern::Output::call(move |record| {
+            // ICI : On envoie chaque log directement dans le tuyau de l'UI
+            let _ = tx.send(format!("{}", record.args()));
+        }))
+        .apply()
+        .expect("Erreur initialisation Fern");
 
-    // 2. Initialiser le logger de façon classique
-    let _handle = flexi_logger::Logger::try_with_str(
-        "info, zbus=warn, wgpu_core=warn, wgpu_hal=warn, naga=warn, iced_wgpu=warn",
-    )
-    .unwrap()
-    .log_to_file(
-        flexi_logger::FileSpec::default()
-            .directory("logs")
-            .basename("terminal_app"),
-    )
-    // On utilise add_writer (qui existe partout)
-    .add_writer("dashboard", dashboard_writer)
-    // Et on utilise duplicate_to_stderr ou duplicate_to_stdout 
-    // AVEC l'option Duplicate::All. C'est souvent ce qui déclenche l'envoi aux writers customs.
-    .duplicate_to_stderr(flexi_logger::Duplicate::All)
-    .start()
-    .unwrap();
-
+    log::info!("Système de log Fern opérationnel");
 
     log::info!("Système de log initialisé au démarrage");
     // idec daemon to manage multiple windows and global events
@@ -65,34 +65,34 @@ pub fn main() -> iced::Result {
                 }
             });
 
+            let rx_cell = rx_cell.clone();
+            let log_events = iced::Subscription::run_with_id(
+                "global-log-stream",
+                iced::stream::channel(100, move |mut output| {
+                    // On tente d'extraire le RX.
+                    // Si c'est déjà fait (None), cette branche ne fera rien.
+                    let rx_opt = rx_cell.lock().unwrap().take();
 
+                    async move {
+                        if let Some(mut rx) = rx_opt {
+                            println!(">>> SUBSCRIPTION : Connexion au canal établie !");
 
-     let rx_cell = rx_cell.clone();
-    let log_events = iced::Subscription::run_with_id(
-        "global-log-stream",
-        iced::stream::channel(100, move |mut output| {
-            // On tente d'extraire le RX. 
-            // Si c'est déjà fait (None), cette branche ne fera rien.
-            let rx_opt = rx_cell.lock().unwrap().take();
-            
-            async move {
-                if let Some(mut rx) = rx_opt {
-                    println!(">>> SUBSCRIPTION : Connexion au canal établie !");
-                    
-                    while let Some(log_msg) = rx.recv().await {
-                        // CE PRINT EST LE JUGE DE PAIX
-                        println!("CANAL REÇOIT : {}", log_msg);
-                        let _ = output.send(Message::LogReceived(log_msg)).await;
+                            while let Some(log_msg) = rx.recv().await {
+                                // CE PRINT EST LE JUGE DE PAIX
+                                println!("CANAL REÇOIT : {}", log_msg);
+                                let _ = output.send(Message::LogReceived(log_msg)).await;
+                            }
+                            println!(">>> SUBSCRIPTION : Canal fermé (RX détruit)");
+                        } else {
+                            // Pour éviter qu'Iced ne relance cette closure en boucle,
+                            // on fait dormir les instances "inutiles"
+                            loop {
+                                tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+                            }
+                        }
                     }
-                    println!(">>> SUBSCRIPTION : Canal fermé (RX détruit)");
-                } else {
-                    // Pour éviter qu'Iced ne relance cette closure en boucle, 
-                    // on fait dormir les instances "inutiles"
-                    loop { tokio::time::sleep(std::time::Duration::from_secs(3600)).await; }
-                }
-            }
-        }),
-    );
+                }),
+            );
 
             iced::Subscription::batch(vec![window_events, events, log_events])
         })

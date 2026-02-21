@@ -93,7 +93,7 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
                 ]
                 .spacing(10) // Réduit un peu l'espacement pour gagner de la place
             )
-            .padding(25)
+            .padding(10)
             .width(Length::Fill)
             .height(Length::Fill)
             .style(move |_| theme::main_container_style(colors)),

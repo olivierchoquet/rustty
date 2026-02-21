@@ -19,4 +19,5 @@ directories = "5.0"
 ansitok = "0.2" # Parseur ANSI très simple et efficace
 vt100 = "0.15" # terminal byte stream and provides an in-memory representation of the rendered contents (ANSI code, vim, ...).
 log = "0.4"
-flexi_logger = "0.27"
+fern = "0.6"
+chrono = "0.4" # Pour avoir l'heure précise dans tes logs
