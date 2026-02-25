@@ -1,0 +1,45 @@
+name: Multi-Platform Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # On utilise les 3 OS officiels de GitHub
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: my_app_linux
+          - os: windows-latest
+            artifact_name: my_app.exe
+          - os: macos-latest
+            artifact_name: my_app_mac
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # --- ÉTAPE CRUCIALE POUR LINUX (ICED) ---
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libfontconfig1-dev libwayland-dev libxkbcommon-dev libx11-dev
+
+      - name: Build Release
+        run: cargo build --release
+
+      # On récupère le binaire généré pour le rendre téléchargeable
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            target/release/votre_projet_nom
+            target/release/votre_projet_nom.exe
