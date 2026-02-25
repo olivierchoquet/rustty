@@ -23,6 +23,7 @@ pub fn render<'a>(active_section: EditSection, colors: TerminalColors) -> Elemen
             
             //nav_button("Avancé", EditSection::Advanced, active_section, colors),
             nav_button("Thèmes", EditSection::Themes, active_section, colors),
+            nav_button("Aide", EditSection::Help, active_section, colors),
             
            
         ]

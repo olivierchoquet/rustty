@@ -5,7 +5,6 @@ use iced::{Element, Task, window};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio::sync::mpsc;
 
 // Internal module imports
 use crate::messages::{ConfigMessage, LoginMessage, Message, ProfileMessage, SshMessage};
@@ -60,16 +59,12 @@ pub struct MyApp {
 
     // --- Logger ---
     pub logs: Vec<String>,
-    pub log_receiver: Option<mpsc::UnboundedReceiver<String>>,
 }
 
 impl MyApp {
     pub fn new(login_id: window::Id) -> Self {
         let loaded_profiles = Profile::load_all();
-        println!(
-            "DEBUG: {} profils chargés au démarrage",
-            loaded_profiles.len()
-        );
+        log::info!("rustty: Dashboard prêt. {} profils chargés.", loaded_profiles.len());
         Self {
             password: "".into(),
             login_window_id: Some(login_id),
@@ -86,7 +81,6 @@ impl MyApp {
             focused_id: ID_PROFILE,
             ssh_handle: None,
             logs: Vec::new(),
-            log_receiver: None,
         }
     }
 
@@ -112,14 +106,14 @@ impl MyApp {
             Message::WindowClosed(id) => self.handle_window_closed(id),
 
             Message::LogReceived(content) => {
-                println!("LOG RECEIVED: {}", content); // Affiche le log dans la console pour debug
-                // On insère à l'index 0 (le haut de la liste)
+                // Put log received on top 
                 self.logs.insert(0, content);
+                self.logs.truncate(100); // Keep 100 recent logs
 
-                // On limite la taille pour ne pas saturer la RAM
-                if self.logs.len() > 100 {
-                    self.logs.pop(); // Supprime le plus vieux (à la fin)
-                }
+                Task::none()
+            }
+            Message::OpenUrl(url) => {
+                let _ = opener::open(url);
                 Task::none()
             }
 
@@ -149,6 +143,7 @@ impl MyApp {
         // 2. Close the associated SSH channel if it exists
         // 3. Clean up the VT100 parser to free memory
         if self.terminal_window_ids.contains(&id) {
+            log::info!("rustty: Fermeture du terminal {:?} et déconnexion.", id);
             self.terminal_window_ids.retain(|&w_id| w_id != id);
             let channel_to_close = self.active_channels.remove(&id);
             self.parsers.remove(&id);
@@ -169,6 +164,7 @@ impl MyApp {
 
         // if the closed window is the login/dashboard, we want to exit the entire application
         if Some(id) == self.login_window_id {
+            log::warn!("rustty: Fermeture de l'application principale.");
             std::process::exit(0);
         }
 
@@ -195,18 +191,18 @@ impl MyApp {
                 Task::none()
             }
 
-            // Lancement de la connexion SSH
+            // Launch SSH Connection
             LoginMessage::Submit => {
-                // 1. Validation de sécurité
-                if self.current_profile.ip.is_empty() || self.current_profile.username.is_empty() {
-                    println!("LOG: Champs manquants pour la connexion.");
+                if self.current_profile.ip.is_empty() 
+                    || self.current_profile.username.is_empty() 
+                    || self.current_profile.port.is_empty()
+                {
+                    log::error!("rustty: Champs manquants (IP, Utilisateur, ...).");
                     return Task::none();
                 }
 
                 self.spawn_index = 0; // On reset l'index de placement
 
-                // 2. Appel au service SSH (on utilise ce que tu as déjà écrit)
-                println!("LOG: Connexion vers {}...", self.current_profile.ip);
                 log::info!(
                     "Tentative de connexion à {}@{}:{}",
                     self.current_profile.username,
@@ -214,11 +210,8 @@ impl MyApp {
                     self.current_profile.port
                 );
 
-                let msg = format!("Tentative de connexion à {}", self.current_profile.ip);
-                log::info!("{}", msg); // Pour le fichier
-                self.logs.insert(0, msg); // Injection DIRECTE dans l'état de l'app
-
                 let count = self.current_profile.terminal_count.max(1);
+                log::info!("rustty: Préparation de {} session(s) parallèle(s)", count);
                 let mut tasks = Vec::new();
 
                 for _ in 0..count {
@@ -237,12 +230,12 @@ impl MyApp {
     fn handle_config_msg(&mut self, msg: ConfigMessage) -> Task<Message> {
         match msg {
             ConfigMessage::SectionChanged(section) => {
-                println!("LOG: Changement de section vers : {:?}", section);
+                log::info!("rustty: Navigation vers la section {:?}", section);
                 self.active_section = section;
             }
             ConfigMessage::ThemeChanged(new_theme) => {
+                log::info!("rustty: Changement de Thèmme {:?}", new_theme);
                 self.current_profile.theme = new_theme;
-                // On sauvegarde immédiatement pour que le choix persiste au redémarrage
                 self.save_profiles();
             }
         }
@@ -253,6 +246,8 @@ impl MyApp {
         match msg {
             // SSH Connection established, we receive the handle and the ID controller for this session
             SshMessage::Connected(Ok((handle, id_controller))) => {
+                log::info!("rustty: Session SSH établie avec succès.");
+                
                 let win_w = 850.0;
                 let win_h = 550.0;
 
@@ -292,6 +287,8 @@ impl MyApp {
 
             // window opened, we need to initialize the VT100 parser for this window and start the SSH shell
             SshMessage::TerminalWindowOpened(id, handle, id_controller) => {
+                log::debug!("rustty: Fenêtre terminal {:?} initialisée (VT100)", id);
+
                 self.terminal_window_ids.push(id);
 
                 // default size for the VT100 parser, it will adapt to the actual window size later when we receive the first data chunk
@@ -308,6 +305,7 @@ impl MyApp {
             SshMessage::DataReceived(id, raw_bytes) => {
                 // update the correct parser/window with the new data
                 if let Some(parser) = self.parsers.get_mut(&id) {
+                    log::debug!("rustty: [{:?}] Réception de {} octets", id, raw_bytes.len());
                     parser.process(&raw_bytes);
                 }
                 // auto scroll to bottom on new data
@@ -322,7 +320,8 @@ impl MyApp {
             }
 
             SshMessage::Connected(Err(e)) => {
-                println!("Erreur de connexion : {}", e);
+                //println!("Erreur de connexion : {}", e);
+                log::error!("Échec de connexion : {}", e);
                 Task::none()
             }
             SshMessage::WindowFocused(id) => {
@@ -346,6 +345,7 @@ impl MyApp {
             if let Some(window_id) = target_window_id {
                 if let Some(channel_arc) = self.active_channels.get(&window_id) {
                     if let Some(bytes) = map_key_to_ssh(&key, modifiers) {
+                        log::debug!("rustty: Touche pressée: {:?}, Bytes envoyés: {:?}", key, bytes);
                         let arc = channel_arc.clone();
                         return Task::perform(
                             async move {
@@ -393,6 +393,7 @@ impl MyApp {
             }
 
             ProfileMessage::Save => {
+                log::info!("rustty: Profil '{}' sauvegardé sur le disque.", self.current_profile.name);
                 self.perform_save_profile();
             }
 
@@ -403,6 +404,7 @@ impl MyApp {
 
             ProfileMessage::Delete => {
                 if let Some(id) = self.selected_profile_id {
+                    log::warn!("rustty: Suppression du profil ID: {}", id);
                     self.profiles.retain(|p| p.id != id);
                     self.selected_profile_id = None;
                     self.current_profile = Profile::default();
@@ -464,10 +466,30 @@ fn map_key_to_ssh(key: &Key, mods: Modifiers) -> Option<Vec<u8>> {
     // special keys and regular character keys
     match key {
         // regular character keys (a, b, c, 1, 2, etc.)
-        Key::Character(c) => Some(c.as_bytes().to_vec()),
+        Key::Character(c) => {
+            // AZERTY LOGIC SPECIFIC SHIFT ---
+            // Map 
+            if mods.shift() {
+                match c.as_str() {
+                    ";" => return Some(vec![b'.']), // Maj + ; = .
+                    "," => return Some(vec![b'?']), // Maj + , = ? 
+                    "M" => return Some(vec![b'M']), // Letter in Maj
+                    _ => {}
+                }
+            }
+            
+            // Si pas de cas spécial, on envoie le caractère tel quel
+            let bytes = c.as_bytes();
+            if !bytes.is_empty() {
+                log::debug!("rustty: Caractère '{}' envoyé", c);
+                return Some(bytes.to_vec());
+            }
+            None
+        }
 
         // special named keys that need to be translated to their corresponding SSH byte sequences
         Key::Named(named) => match named {
+            Named::Space => Some(vec![32]),      // Space
             Named::Enter => Some(vec![13]),      // Carriage Return
             Named::Backspace => Some(vec![127]), // DEL (standard Linux)
             Named::Tab => Some(vec![9]),         // Horizontal Tab
@@ -479,7 +501,10 @@ fn map_key_to_ssh(key: &Key, mods: Modifiers) -> Option<Vec<u8>> {
             Named::ArrowRight => Some(vec![27, 91, 67]),
             Named::ArrowLeft => Some(vec![27, 91, 68]),
 
-            _ => None,
+            _ => {
+                log::debug!("rustty: Touche nommée non gérée: {:?}", named);
+                None
+            }
         },
         _ => None,
     }

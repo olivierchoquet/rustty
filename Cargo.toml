@@ -21,3 +21,4 @@ vt100 = "0.15" # terminal byte stream and provides an in-memory representation o
 log = "0.4"
 fern = "0.6"
 chrono = "0.4" # Pour avoir l'heure précise dans tes logs
+opener = "0.7"

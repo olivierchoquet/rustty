@@ -283,3 +283,31 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
     .spacing(20)
     .into()
 }
+
+pub fn help_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Message> {
+     column![
+        text("AIDE")
+            .size(18)
+            .font(Font {
+                weight: Weight::Bold,
+                ..Font::default()
+            })
+            .color(colors.accent),
+        row![
+            text("Auteur : Olivier Choquet")
+            .size(16)
+            .color(colors.text),
+        ],
+        row![
+            button(text("https://github.com/olivierchoquet/rustty").color(Color::from_rgb(0.0, 0.4, 1.0)))
+                .on_press(Message::OpenUrl("https://github.com/olivierchoquet/rustty".to_string()))
+                .style(button::text) 
+        ],
+        row![
+            text("Issues ou Pull Requests peuvent être créées sur le dépôt GitHub")
+            .size(16)
+            .color(colors.text),
+        ]
+         
+    ].spacing(15).into()
+}

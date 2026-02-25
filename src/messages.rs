@@ -13,6 +13,7 @@ pub enum Message {
     WindowClosed(window::Id),
     QuitRequested,
     DoNothing,
+    OpenUrl(String),
 
     // --- Sub-domain (Breakdown by topic) ---
     Login(LoginMessage),     // Everything related to input fields
