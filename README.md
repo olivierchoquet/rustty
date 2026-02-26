@@ -25,7 +25,6 @@ src/
     ├── dashboard.rs # Main window (profile, ...)
     ├── terminal.rs  # Terminal emulation and rendering logic
     ├── theme.rs     # Styling, colors, and custom widget themes
-    ├── ui.rs        # View router / navigation logic
     ├── views/       # High-level application screens
     └── components/  # Reusable UI building blocks (forms, buttons, etc.)
 ```
