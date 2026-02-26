@@ -64,7 +64,10 @@ pub struct MyApp {
 impl MyApp {
     pub fn new(login_id: window::Id) -> Self {
         let loaded_profiles = Profile::load_all();
-        log::info!("rustty: Dashboard prêt. {} profils chargés.", loaded_profiles.len());
+        log::info!(
+            "rustty: Dashboard prêt. {} profils chargés.",
+            loaded_profiles.len()
+        );
         Self {
             password: "".into(),
             login_window_id: Some(login_id),
@@ -106,7 +109,7 @@ impl MyApp {
             Message::WindowClosed(id) => self.handle_window_closed(id),
 
             Message::LogReceived(content) => {
-                // Put log received on top 
+                // Put log received on top
                 self.logs.insert(0, content);
                 self.logs.truncate(100); // Keep 100 recent logs
 
@@ -193,8 +196,8 @@ impl MyApp {
 
             // Launch SSH Connection
             LoginMessage::Submit => {
-                if self.current_profile.ip.is_empty() 
-                    || self.current_profile.username.is_empty() 
+                if self.current_profile.ip.is_empty()
+                    || self.current_profile.username.is_empty()
                     || self.current_profile.port.is_empty()
                 {
                     log::error!("rustty: Champs manquants (IP, Utilisateur, ...).");
@@ -247,7 +250,7 @@ impl MyApp {
             // SSH Connection established, we receive the handle and the ID controller for this session
             SshMessage::Connected(Ok((handle, id_controller))) => {
                 log::info!("rustty: Session SSH établie avec succès.");
-                
+
                 let win_w = 850.0;
                 let win_h = 550.0;
 
@@ -334,43 +337,72 @@ impl MyApp {
     }
 
     fn handle_keyboard_event(&mut self, event: iced::Event) -> Task<Message> {
-        if let iced::Event::Keyboard(iced::keyboard::Event::KeyPressed { key, modifiers, .. }) =
-            event
-        {
-            // --- CASE A : SENDING DATA TO SSH TERMINAL ---
-            let target_window_id = self
-                .focused_window_id
-                .or_else(|| self.terminal_window_ids.last().cloned());
-
-            if let Some(window_id) = target_window_id {
-                if let Some(channel_arc) = self.active_channels.get(&window_id) {
-                    if let Some(bytes) = map_key_to_ssh(&key, modifiers) {
-                        log::debug!("rustty: Touche pressée: {:?}, Bytes envoyés: {:?}", key, bytes);
-                        let arc = channel_arc.clone();
-                        return Task::perform(
-                            async move {
-                                let mut ch = arc.lock().await;
-                                let _ = ch.data(&bytes[..]).await;
-                            },
-                            |_| Message::DoNothing,
-                        );
+        match event {
+            iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                key,
+                modifiers,
+                text,
+                ..
+            }) => {
+                // 1. CTRL shortcut
+                if modifiers.control() {
+                    if let Key::Character(ref c) = key {
+                        let b = c.as_bytes();
+                        if !b.is_empty() {
+                            return self.send_to_terminal(vec![b[0] & 0x1f]);
+                        }
                     }
-                    return Task::none();
+                }
+
+                // 2. TRADUCTED TEXT (dots, commas, etc.)
+                if let Some(t) = text {
+                    let c = t.chars().next().unwrap_or('\0');
+                    if !c.is_control() {
+                        log::debug!("rustty: Texte traduit reçu: '{}'", t);
+                        return self.send_to_terminal(t.as_bytes().to_vec());
+                    }
+                }
+
+                // 3. COMMANDS (Enter, Backspace, Arrow...)
+                if let Key::Named(named) = key {
+                    let bytes = match named {
+                        Named::Enter => Some(vec![13]),
+                        Named::Backspace => Some(vec![127]),
+                        Named::Tab => Some(vec![9]),
+                        Named::Escape => Some(vec![27]),
+                        Named::ArrowUp => Some(vec![27, 91, 65]),
+                        Named::ArrowDown => Some(vec![27, 91, 66]),
+                        Named::ArrowRight => Some(vec![27, 91, 67]),
+                        Named::ArrowLeft => Some(vec![27, 91, 68]),
+                        _ => None,
+                    };
+
+                    if let Some(b) = bytes {
+                        return self.send_to_terminal(b);
+                    }
                 }
             }
+            _ => {}
+        }
+        Task::none()
+    }
 
-            // --- CASE B : NAVIGATION TAB (LOGIN) ---
-            if key == Key::Named(Named::Tab) {
-                let next_id = match self.focused_id {
-                    ID_PROFILE => ID_GROUP,
-                    ID_GROUP => ID_IP,
-                    ID_IP => ID_PORT,
-                    ID_PORT => ID_USER,
-                    ID_USER => ID_PASS,
-                    _ => ID_PROFILE,
-                };
-                self.focused_id = next_id;
-                return text_input::focus(text_input::Id::new(next_id));
+    fn send_to_terminal(&self, bytes: Vec<u8>) -> Task<Message> {
+        // We target the focused window or the last opened window
+        let target_window_id = self
+            .focused_window_id
+            .or_else(|| self.terminal_window_ids.last().cloned());
+
+        if let Some(window_id) = target_window_id {
+            if let Some(channel_arc) = self.active_channels.get(&window_id) {
+                let arc = channel_arc.clone();
+                return Task::perform(
+                    async move {
+                        let mut ch = arc.lock().await;
+                        let _ = ch.data(&bytes[..]).await;
+                    },
+                    |_| Message::DoNothing,
+                );
             }
         }
         Task::none()
@@ -393,7 +425,10 @@ impl MyApp {
             }
 
             ProfileMessage::Save => {
-                log::info!("rustty: Profil '{}' sauvegardé sur le disque.", self.current_profile.name);
+                log::info!(
+                    "rustty: Profil '{}' sauvegardé sur le disque.",
+                    self.current_profile.name
+                );
                 self.perform_save_profile();
             }
 
@@ -420,7 +455,7 @@ impl MyApp {
             return;
         }
 
-        // Normalisation du groupe
+        // group normalization
         if self.current_profile.group.is_empty() {
             self.current_profile.group = "DEFAUT".to_string();
         }
@@ -445,67 +480,5 @@ impl MyApp {
         self.profiles
             .sort_by(|a, b| a.group.cmp(&b.group).then(a.name.cmp(&b.name)));
         self.save_profiles();
-    }
-}
-
-// pure function no self needed
-fn map_key_to_ssh(key: &Key, mods: Modifiers) -> Option<Vec<u8>> {
-    // shortcut keyboard combinations with Control (e.g., Ctrl+C, Ctrl+D, etc.)
-    // control key is pressed ?
-    if mods.control() {
-        if let Key::Character(c) = key {
-            let b = c.as_bytes();
-            if !b.is_empty() {
-                // In ASCII, Ctrl + key corresponds to the key MASKED by 0x1f
-                // Example : 'c' (99) & 0x1f = 3 (Code ETX/Ctrl+C)
-                return Some(vec![b[0] & 0x1f]);
-            }
-        }
-    }
-
-    // special keys and regular character keys
-    match key {
-        // regular character keys (a, b, c, 1, 2, etc.)
-        Key::Character(c) => {
-            // AZERTY LOGIC SPECIFIC SHIFT ---
-            // Map 
-            if mods.shift() {
-                match c.as_str() {
-                    ";" => return Some(vec![b'.']), // Maj + ; = .
-                    "," => return Some(vec![b'?']), // Maj + , = ? 
-                    "M" => return Some(vec![b'M']), // Letter in Maj
-                    _ => {}
-                }
-            }
-            
-            // Si pas de cas spécial, on envoie le caractère tel quel
-            let bytes = c.as_bytes();
-            if !bytes.is_empty() {
-                log::debug!("rustty: Caractère '{}' envoyé", c);
-                return Some(bytes.to_vec());
-            }
-            None
-        }
-
-        // special named keys that need to be translated to their corresponding SSH byte sequences
-        Key::Named(named) => match named {
-            Named::Space => Some(vec![32]),      // Space
-            Named::Enter => Some(vec![13]),      // Carriage Return
-            Named::Backspace => Some(vec![127]), // DEL (standard Linux)
-            Named::Tab => Some(vec![9]),         // Horizontal Tab
-            Named::Escape => Some(vec![27]),     // ESC
-
-            // escape sequences for arrow keys (common in VT100 terminals)
-            Named::ArrowUp => Some(vec![27, 91, 65]),
-            Named::ArrowDown => Some(vec![27, 91, 66]),
-            Named::ArrowRight => Some(vec![27, 91, 67]),
-            Named::ArrowLeft => Some(vec![27, 91, 68]),
-
-            _ => {
-                log::debug!("rustty: Touche nommée non gérée: {:?}", named);
-                None
-            }
-        },
-        _ => None,
     }
 }
