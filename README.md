@@ -1,19 +1,15 @@
 
 ## 🚀 Getting Started
 
-    1. Install Rust: Download the toolchain from rust-lang.org/tools/install.
+    1. Install Rust: Download the toolchain from https://rust-lang.org/fr/learn/get-started.
 
     2. Setup IDE: Install rust-analyzer and CodeLLDB extensions in VS Code for a better developer experience.
 
-    3. Clone Repository: ```bash
-    git clone https://www.google.com/search?q=https://github.com/your-username/project-name.git
-    cd project-name
+    3. Clone Repository: git clone https://github.com/olivierchoquet/rustty.git
 
-    4. Build & Run: ```bash
-    cargo run
+    4. Build & Run: cargo run
 
-    5. Build for production ```bash 
-    cargo build --release
+    5. Build for production : cargo build --release
 
 ## 📂 Project Structure
 
