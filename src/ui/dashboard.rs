@@ -1,15 +1,12 @@
 use iced::{
-    Alignment, Color, Element, Font, Length, Task, border,
-    font::Weight,
-    widget::{column, container, horizontal_rule, row, text, text_input, vertical_space},
+    Color, Element, Font, Length, border, font::Weight, widget::{column, container, horizontal_rule, row, text, vertical_space}
 };
 
-use crate::ui::components::{actions_bar, sidebar};
+use crate::ui::components::{actions_bar, forms::help_form, sidebar};
 use crate::{
-    messages::{ConfigMessage, LoginMessage, Message, ProfileMessage},
+    messages::Message,
     ui::{
-        EditSection, MyApp, Profile,
-        components::{
+        EditSection, MyApp, components::{
             forms::{general_form, theme_form},
             search_table::{content, header},
         },
@@ -67,6 +64,7 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
         .spacing(20)
         .into(),*/
         EditSection::Themes => column![theme_form(app, colors),].spacing(20).into(),
+        EditSection::Help => column![help_form(app,colors)].spacing(20).into(),
 
         _ => column![text("Section en cours de développement...").color(colors.text),]
             .spacing(20)
@@ -83,15 +81,12 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
                 column![
                     brand_header,
                     vertical_space().height(10),
-                    // ON ENVELOPPE LE CONTENU DYNAMIQUE
-                    // Cela garantit qu'il ne déborde pas sur les logs
                     container(dynamic_content)
-                        .height(Length::Fill) // Prend tout l'espace restant
+                        .height(Length::Fill) 
                         .width(Length::Fill),
-                    // PAS BESOIN de vertical_space() ici si dynamic_content est Fill
-                    logs_panel, // Placé juste au dessus de la barre d'action
+                    logs_panel,
                 ]
-                .spacing(10) // Réduit un peu l'espacement pour gagner de la place
+                .spacing(10)
             )
             .padding(10)
             .width(Length::Fill)
@@ -112,29 +107,38 @@ pub fn log_view<'a>(
 ) -> Element<'a, Message> {
     let log_content = column(
         logs.iter()
-            .take(15) // On prend juste les 15 premiers (ce sont les plus récents grâce au insert(0))
+            .take(15) // Take last recents logs
             .map(|l| {
+                let log_color = if l.contains("ERROR") || l.contains("Échec") {
+                    Color::from_rgb(1.0, 0.4, 0.4) // ERROR always red
+                } else if l.contains("INFO") {
+                    colors.accent 
+                } else {
+                    colors.text
+                };
                 text(l)
-                    .size(11)
+                    .size(14)
                     .font(Font::MONOSPACE)
-                    .color(Color::WHITE) // On garde le blanc pour le debug
+                    .color(log_color) // On garde le blanc pour le debug
                     .into()
             })
             .collect::<Vec<Element<'a, Message>>>(),
     )
-    .spacing(3);
+    .spacing(2);
 
     container(log_content)
         .width(Length::Fill)
-        .height(Length::Fixed(120.0)) // Fixe pour être sûr qu'il ne disparaisse pas
+        .height(Length::Fixed(200.0)) // Fixe pour être sûr qu'il ne disparaisse pas
         .padding(10)
         .style(move |_| container::Style {
-            background: Some(Color::from_rgb(0.1, 0.1, 0.1).into()),
-            border: iced::Border {
-                color: Color::WHITE,
-                width: 1.0,
-                radius: 5.0.into(),
-            },
+            background: Some(Color {
+                    a: 0.05,
+                    ..colors.accent
+            }.into()),
+            border: border::rounded(5)
+                .width(1.0)
+                .color(colors.accent),
+                
             ..Default::default()
         })
         .into()

@@ -1,28 +1,35 @@
-1. Installer Rust : https://rust-lang.org/fr/tools/install/
-2. Cloner le dépôt
-3. cargo run
-4. extensions vscode : rust-analyzer et CodeLLDB
 
-## Structure du Projet
+## 🚀 Getting Started
 
+    1. Install Rust: Download the toolchain from rust-lang.org/tools/install.
+
+    2. Setup IDE: Install rust-analyzer and CodeLLDB extensions in VS Code for a better developer experience.
+
+    3. Clone Repository: ```bash
+    git clone https://www.google.com/search?q=https://github.com/your-username/project-name.git
+    cd project-name
+
+    4. Build & Run: ```bash
+    cargo run
+
+    5. Build for production ```bash 
+    cargo build --release
+
+## 📂 Project Structure
+
+```text
 src/
-├── main.rs         <-- Point d'entrée, déclare "mod ui;" et "mod ssh;"
-├── messages.rs     <-- Tes Enums (Message, SshMessage, etc.)
-├── models.rs       <-- Contient les structures de données : Profile, EditSection
-├── ssh.rs          <-- Ta logique réseau/russh
-├── ui.rs           <-- Le "cerveau" de l'UI (MyApp, update, view)
-└── ui/             <-- Dossier privé de l'UI
-    ├── constants.rs
-    ├── terminal.rs
-    ├── theme.rs
-    ├── views.rs    <-- Aiguillage vers les différentes fenêtres
-    ├── views/
-    └── components/ <-- Dossier contenant tes briques (forms, buttons...)
+├── main.rs          # Entry point
+├── messages.rs      # Enums for application events (Message, SshMessage, etc.)
+├── models.rs        # Data structures (Profile, EditSection, Config)
+├── ssh.rs           # Network logic and russh implementation
+├── ui.rs            # Main UI controller (App state, update, and view)
+└── ui/              # Private UI module
+    ├── constants.rs # Layout constants (paddings, font sizes, etc.)
+    ├── terminal.rs  # Terminal emulation and rendering logic
+    ├── theme.rs     # Styling, colors, and custom widget themes
+    ├── ui.rs        # View router / navigation logic
+    ├── views/       # High-level application screens
+    └── components/  # Reusable UI building blocks (forms, buttons, etc.)
+```
 
-## Remarques Rust
-
-Remarques :
-
-Rendu visuel (forms, components, ..)
-
-Iced travaille avec des types Element<'a, Message>. Le 'a indique au compilateur : "Ce widget contient des références à des données qui doivent rester valides tant que le widget est affiché". Sans le 'a sur tes &str, Rust a peur que le texte disparaisse de la mémoire alors que l'interface essaie encore de l'afficher.

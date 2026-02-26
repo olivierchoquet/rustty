@@ -70,4 +70,5 @@ pub enum EditSection {
     Network,
     Advanced,
     Themes,
+    Help
 }
