@@ -26,6 +26,7 @@ src/
 ├── ui.rs            # Main UI controller (App state, update, and view)
 └── ui/              # Private UI module
     ├── constants.rs # Layout constants (paddings, font sizes, etc.)
+    ├── dashboard.rs # Main window (profile, ...)
     ├── terminal.rs  # Terminal emulation and rendering logic
     ├── theme.rs     # Styling, colors, and custom widget themes
     ├── ui.rs        # View router / navigation logic
