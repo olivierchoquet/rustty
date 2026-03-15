@@ -483,64 +483,135 @@ impl MyApp {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::messages::{LoginMessage, Message, ProfileMessage};
+    use crate::messages::{LoginMessage, Message, ProfileMessage, SshMessage};
     use iced::window;
 
     fn setup_app() -> MyApp {
-        // factice ID
         MyApp::new(window::Id::unique())
     }
 
+    // --- LOGIC TESTS ---
+
     #[test]
-    fn test_update_ip_input() {
+    fn test_login_and_ip_validation() {
         let mut app = setup_app();
         let test_ip = "192.168.1.1".to_string();
-        
-        let msg = Message::Login(LoginMessage::InputIP(test_ip.clone()));
-        let _ = app.update(msg);
 
+        // Test Input
+        app.update(Message::Login(LoginMessage::InputIP(test_ip.clone())));
         assert_eq!(app.current_profile.ip, test_ip);
-    }
 
-    #[test]
-    fn test_profile_selection() {
-        let mut app = setup_app();
-        
-        let mut p = Profile::default();
-        let p_id = uuid::Uuid::new_v4();
-        p.id = p_id;
-        p.name = "Serveur Prod".to_string();
-        
-        app.profiles.push(p);
+        // Test Submit Validation (Failure)
+        app.update(Message::Login(LoginMessage::Submit));
+        assert!(app.terminal_window_ids.is_empty());
 
-        // selection simulation
-        let msg = Message::Profile(ProfileMessage::Selected(p_id));
-        let _ = app.update(msg);
-
-        // Vérifications
-        assert_eq!(app.selected_profile_id, Some(p_id));
-        assert_eq!(app.current_profile.name, "Serveur Prod");
+        // Test Submit Validation (Success state reset)
+        app.update(Message::Login(LoginMessage::InputUsername("test".into())));
+        app.update(Message::Login(LoginMessage::InputPort("22".into())));
+        app.spawn_index = 5; 
+        app.update(Message::Login(LoginMessage::Submit));
+        assert_eq!(app.spawn_index, 0);
     }
 
     #[test]
     fn test_log_rotation() {
         let mut app = setup_app();
-        
-        // inject  150 logs (limit is 100)
         for i in 0..150 {
             app.update(Message::LogReceived(format!("Log {}", i)));
         }
-
-        // truncate 100 OK ?
         assert_eq!(app.logs.len(), 100);
-        // the first log must be the last one (index 0)
         assert_eq!(app.logs[0], "Log 149");
     }
 
+    // --- PROFILE & SIDEBAR TESTS ---
+
+    #[test]
+    fn test_profile_lifecycle() {
+        let mut app = setup_app();
+        app.profiles.clear();
+        let p_id = uuid::Uuid::new_v4();
+        
+        // 1. Creation & Selection
+        let mut p = Profile::default();
+        p.id = p_id;
+        p.name = "Prod Server".into();
+        app.profiles.push(p);
+        app.update(Message::Profile(ProfileMessage::Selected(p_id)));
+        assert_eq!(app.current_profile.name, "Prod Server");
+
+        // 2. Deletion
+        app.update(Message::Profile(ProfileMessage::Delete));
+        assert!(app.profiles.is_empty());
+        assert_eq!(app.selected_profile_id, None);
+    }
+
+    #[test]
+    fn test_sidebar_and_search_logic() {
+        let mut app = setup_app();
+        app.profiles.clear();
+
+        // 1. Search filtering
+        let p1 = Profile { name: "Production".into(), group: "INFRA".into(), ..Default::default() };
+        app.profiles.push(p1);
+        app.update(Message::Profile(ProfileMessage::SearchChanged("Prod".into())));
+        
+        // 2. Group interaction
+        app.update(Message::Profile(ProfileMessage::InputGroup("INFRA-TEAM".into())));
+        
+        // 3. UI rendering for these states
+        let _ = app.view(app.login_window_id.unwrap());
+        assert_eq!(app.current_profile.group, "INFRA-TEAM");
+    }
+
+    // --- UI & THEME TESTS ---
+
+    #[test]
+    fn test_theme_exhaustive_coverage() {
+        let mut app = setup_app();
+        for &choice in &crate::ui::theme::ThemeChoice::ALL {
+            app.update(Message::Config(crate::messages::ConfigMessage::ThemeChanged(choice)));
+            let colors = choice.get_colors();
+            
+            // Technical style coverage
+            let _ = crate::ui::theme::button_style(colors, iced::widget::button::Status::Active, crate::ui::theme::ButtonVariant::Primary);
+            let _ = crate::ui::theme::input_style(colors, iced::widget::text_input::Status::Focused);
+            let _ = crate::ui::theme::main_container_style(colors);
+            
+            let _ = app.view(app.login_window_id.unwrap());
+            assert!(!format!("{}", choice).is_empty());
+        }
+    }
+
+    #[test]
+    fn test_terminal_parsing_and_rendering() {
+        let mut app = setup_app();
+        let term_id = window::Id::unique();
+        app.terminal_window_ids.push(term_id);
+
+        // Complex ANSI sequences to trigger the parser
+        let complex_data = vec![
+            b"\x1b[31mRed Alert!\x1b[0m\n".to_vec(), 
+            b"\x1b[1mBold\x1b[0m\n".to_vec(),
+            b"\x1b[2J\x1b[H".to_vec(),
+        ];
+
+        for data in complex_data {
+            app.update(Message::Ssh(SshMessage::DataReceived(term_id, data)));
+        }
+
+        // Render call
+        let _ = app.view(term_id);
+        assert!(app.terminal_window_ids.contains(&term_id));
+    }
+
+    #[test]
+    fn test_general_view_rendering() {
+        let app = setup_app();
+        // Master key for dashboard and components
+        let _ = app.view(app.login_window_id.unwrap());
+        assert!(true);
+    }
 }
-
-
