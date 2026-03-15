@@ -482,3 +482,65 @@ impl MyApp {
         self.save_profiles();
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::messages::{LoginMessage, Message, ProfileMessage};
+    use iced::window;
+
+    fn setup_app() -> MyApp {
+        // factice ID
+        MyApp::new(window::Id::unique())
+    }
+
+    #[test]
+    fn test_update_ip_input() {
+        let mut app = setup_app();
+        let test_ip = "192.168.1.1".to_string();
+        
+        let msg = Message::Login(LoginMessage::InputIP(test_ip.clone()));
+        let _ = app.update(msg);
+
+        assert_eq!(app.current_profile.ip, test_ip);
+    }
+
+    #[test]
+    fn test_profile_selection() {
+        let mut app = setup_app();
+        
+        let mut p = Profile::default();
+        let p_id = uuid::Uuid::new_v4();
+        p.id = p_id;
+        p.name = "Serveur Prod".to_string();
+        
+        app.profiles.push(p);
+
+        // selection simulation
+        let msg = Message::Profile(ProfileMessage::Selected(p_id));
+        let _ = app.update(msg);
+
+        // Vérifications
+        assert_eq!(app.selected_profile_id, Some(p_id));
+        assert_eq!(app.current_profile.name, "Serveur Prod");
+    }
+
+    #[test]
+    fn test_log_rotation() {
+        let mut app = setup_app();
+        
+        // inject  150 logs (limit is 100)
+        for i in 0..150 {
+            app.update(Message::LogReceived(format!("Log {}", i)));
+        }
+
+        // truncate 100 OK ?
+        assert_eq!(app.logs.len(), 100);
+        // the first log must be the last one (index 0)
+        assert_eq!(app.logs[0], "Log 149");
+    }
+
+}
+
+
