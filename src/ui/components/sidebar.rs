@@ -1,8 +1,11 @@
-use iced::widget::{button, column, container, text, vertical_space};
-use iced::{Alignment, Border, Element, Length};
 use crate::messages::{ConfigMessage, Message};
 use crate::ui::components::brand;
-use crate::ui::{ EditSection, theme::{self, TerminalColors}};
+use crate::ui::{
+    EditSection,
+    theme::{self, TerminalColors},
+};
+use iced::widget::{button, column, container, text, vertical_space};
+use iced::{Border, Element, Length};
 
 pub fn render<'a>(active_section: EditSection, colors: TerminalColors) -> Element<'a, Message> {
     container(
@@ -11,24 +14,21 @@ pub fn render<'a>(active_section: EditSection, colors: TerminalColors) -> Elemen
             text("NAVIGATION")
                 .size(14)
                 .color(colors.accent)
-                .font(iced::Font { weight: iced::font::Weight::Bold, ..iced::Font::DEFAULT }),
-            
+                .font(iced::Font {
+                    weight: iced::font::Weight::Bold,
+                    ..iced::Font::DEFAULT
+                }),
             vertical_space().height(10),
-            
             nav_button("Général", EditSection::General, active_section, colors),
             //nav_button("Sécurité", EditSection::Auth, active_section, colors),
             //nav_button("Réseau", EditSection::Network, active_section, colors),
-            
             vertical_space().height(Length::Fill),
-            
             //nav_button("Avancé", EditSection::Advanced, active_section, colors),
             nav_button("Thèmes", EditSection::Themes, active_section, colors),
             nav_button("Aide", EditSection::Help, active_section, colors),
-            
-           
         ]
         .spacing(10)
-        .padding(15)
+        .padding(15),
     )
     .width(Length::Fixed(200.0))
     .height(Length::Fill)
@@ -51,7 +51,7 @@ fn nav_button<'a>(
         .on_press(Message::Config(ConfigMessage::SectionChanged(section)))
         .padding(10)
         .style(move |_, status| {
-            let mut s = theme::button_style(colors, status,theme::ButtonVariant::Secondary);
+            let mut s = theme::button_style(colors, status, theme::ButtonVariant::Secondary);
             if is_active {
                 s.background = Some(colors.accent.into());
                 s.text_color = iced::Color::BLACK;

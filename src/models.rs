@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use uuid::Uuid;
-use serde::{Serialize, Deserialize};
 use crate::ui::theme::ThemeChoice;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Profile {
@@ -13,7 +13,7 @@ pub struct Profile {
     pub username: String,
     pub group: String,
     pub theme: ThemeChoice,
-    pub terminal_count: usize
+    pub terminal_count: usize,
 }
 
 impl std::fmt::Display for Profile {
@@ -25,7 +25,7 @@ impl std::fmt::Display for Profile {
 impl Profile {
     const FILE_PATH: &'static str = "profiles.json";
 
-    pub fn default() -> Self {
+    pub fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
             name: "Nouveau Profil".into(),
@@ -33,7 +33,7 @@ impl Profile {
             ip: "".into(),
             port: "22".into(),
             username: "".into(),
-            theme: crate::ui::theme::ThemeChoice::Slate, 
+            theme: crate::ui::theme::ThemeChoice::Slate,
             terminal_count: 1,
         }
     }
@@ -55,10 +55,10 @@ impl Profile {
 
     /// SAve all profiles to the JSON file, overwriting existing content. Logs an error if writing fails.
     pub fn save_all(profiles: &[Self]) {
-        if let Ok(json) = serde_json::to_string_pretty(profiles) {
-            if let Err(e) = std::fs::write(Self::FILE_PATH, json) {
-                eprintln!("Erreur d'écriture: {}", e);
-            }
+        if let Ok(json) = serde_json::to_string_pretty(profiles)
+            && let Err(e) = std::fs::write(Self::FILE_PATH, json)
+        {
+            eprintln!("Erreur d'écriture: {}", e);
         }
     }
 }
@@ -70,5 +70,5 @@ pub enum EditSection {
     Network,
     Advanced,
     Themes,
-    Help
+    Help,
 }
