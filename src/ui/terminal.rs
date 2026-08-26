@@ -32,7 +32,7 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
     let tab_bar = container(
         row![
             container(
-                text(format!(" 🐚 {} ", &app.current_profile.ip))
+                text(format!(" 🐚 {} ", app.current_profile.ip))
                     .size(13)
                     .font(iced::Font::MONOSPACE)
                     .color(colors.text)
