@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use crate::messages::{Message, SshMessage};
 use async_trait::async_trait;
 use iced::{
@@ -11,6 +10,7 @@ use russh::{
     client::{self, Session},
     keys::key,
 };
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub type SshChannel = russh::Channel<russh::client::Msg>;
@@ -23,10 +23,12 @@ pub struct MyHandler {
 }
 
 impl MyHandler {
-    /// Pure logic for routing data to the UI. 
+    /// Pure logic for routing data to the UI.
     /// Extracted from the trait to allow safe unit testing without unsafe mocks.
     pub fn handle_data_routing(&mut self, window_id: window::Id, data: Vec<u8>) {
-        let _ = self.sender.try_send(Message::Ssh(SshMessage::DataReceived(window_id, data)));
+        let _ = self
+            .sender
+            .try_send(Message::Ssh(SshMessage::DataReceived(window_id, data)));
     }
 }
 
@@ -58,30 +60,40 @@ pub struct SshService;
 impl SshService {
     pub fn connect(profile_ip: String, port: u16, user: String, pass: String) -> Task<Message> {
         Task::stream(iced::stream::channel(100, move |mut output| async move {
-            let config = Arc::new(client::Config::default()); 
+            let config = Arc::new(client::Config::default());
             let window_id_container = Arc::new(Mutex::new(None));
             let handler = MyHandler {
                 sender: output.clone(),
-                window_id: window_id_container.clone(), 
+                window_id: window_id_container.clone(),
             };
 
             match client::connect(config, (profile_ip.as_str(), port), handler).await {
                 Ok(mut handle) => {
-                    if handle.authenticate_password(user, pass).await.unwrap_or(false) {
-                        let _ = output.send(Message::Ssh(SshMessage::Connected(Ok((
+                    if handle
+                        .authenticate_password(user, pass)
+                        .await
+                        .unwrap_or(false)
+                    {
+                        let _ = output
+                            .send(Message::Ssh(SshMessage::Connected(Ok((
                                 Arc::new(Mutex::new(handle)),
-                                window_id_container, 
-                            ))))).await;
+                                window_id_container,
+                            )))))
+                            .await;
                     } else {
-                        let _ = output.send(Message::Ssh(SshMessage::Connected(Err(
+                        let _ = output
+                            .send(Message::Ssh(SshMessage::Connected(Err(
                                 "Authentication failed".into(),
-                            )))).await;
+                            ))))
+                            .await;
                     }
                 }
                 Err(_) => {
-                    let _ = output.send(Message::Ssh(SshMessage::Connected(Err(
-                            "Server not found".into(),
-                        )))).await;
+                    let _ = output
+                        .send(Message::Ssh(SshMessage::Connected(Err(
+                            "Server not found".into()
+                        ))))
+                        .await;
                 }
             }
         }))
@@ -101,12 +113,14 @@ impl SshService {
                     *w_id_lock = Some(window_id);
                 }
 
-                let mut ch = {
-                    let mut h_lock = handle.lock().await;
+                let ch = {
+                    let h_lock = handle.lock().await;
                     h_lock.channel_open_session().await.ok()?
                 };
 
-                ch.request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes).await.ok()?;
+                ch.request_pty(true, "xterm-256color", 80, 24, 0, 0, &manual_modes)
+                    .await
+                    .ok()?;
                 ch.request_shell(true).await.ok()?;
 
                 Some(Arc::new(Mutex::new(ch)))
@@ -119,7 +133,6 @@ impl SshService {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,26 +141,29 @@ mod tests {
     use tokio::sync::Mutex;
 
     /// Test 1: Successful data routing
-    /// Ensures that when data is received, it is correctly wrapped in a Message 
+    /// Ensures that when data is received, it is correctly wrapped in a Message
     /// and sent to the UI channel with the correct window ID.
     #[tokio::test]
     async fn test_handler_routing_success() {
         let (tx, mut rx) = mpsc::channel(100);
         let win_id = window::Id::unique();
-        
+
         let mut handler = MyHandler {
             window_id: Arc::new(Mutex::new(Some(win_id))),
             sender: tx,
         };
 
         let test_payload = b"unit test data".to_vec();
-        
+
         // Directly trigger the routing logic
         handler.handle_data_routing(win_id, test_payload.clone());
 
         // Check if the message was sent to the receiver
-        let received = rx.try_next().unwrap().expect("Message should be in the channel");
-        
+        let received = rx
+            .try_next()
+            .unwrap()
+            .expect("Message should be in the channel");
+
         if let Message::Ssh(SshMessage::DataReceived(id, data)) = received {
             assert_eq!(id, win_id, "Window ID mismatch");
             assert_eq!(data, test_payload, "Payload data corruption");
@@ -157,7 +173,7 @@ mod tests {
     }
 
     /// Test 2: Shared Window ID update
-    /// Validates that the shared pointer between the UI and the SSH task 
+    /// Validates that the shared pointer between the UI and the SSH task
     /// is correctly updated when a new terminal opens.
     #[tokio::test]
     async fn test_shared_window_id_locking() {
@@ -172,7 +188,11 @@ mod tests {
 
         // Verify the value is correctly stored
         let updated_id = *shared_id.lock().await;
-        assert_eq!(updated_id, Some(new_win_id), "Shared window ID was not updated correctly");
+        assert_eq!(
+            updated_id,
+            Some(new_win_id),
+            "Shared window ID was not updated correctly"
+        );
     }
 
     /// Test 3: Large payload handling
@@ -189,7 +209,10 @@ mod tests {
         let large_payload = vec![b'A'; 4096]; // 4KB of data
         handler.handle_data_routing(win_id, large_payload.clone());
 
-        let received = rx.try_next().unwrap().expect("Should receive large payload");
+        let received = rx
+            .try_next()
+            .unwrap()
+            .expect("Should receive large payload");
         if let Message::Ssh(SshMessage::DataReceived(_, data)) = received {
             assert_eq!(data.len(), 4096);
         }

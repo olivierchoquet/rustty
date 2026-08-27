@@ -3,8 +3,6 @@ pub mod models;
 pub mod ssh;
 pub mod ui;
 
-use std::fmt::Debug;
-
 use iced::{Task, futures::SinkExt, widget::text_input, window};
 use messages::Message;
 use ui::{MyApp, constants::*};
@@ -13,7 +11,7 @@ pub fn main() -> iced::Result {
     // Create logs dir if does not exist
     let _ = std::fs::create_dir_all("logs");
 
-    // Log channel 
+    // Log channel
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     let rx_cell = std::sync::Arc::new(std::sync::Mutex::new(Some(rx)));
 
@@ -33,7 +31,7 @@ pub fn main() -> iced::Result {
         .level(log::LevelFilter::Warn)
         //.level_for("zbus", log::LevelFilter::Warn)
         //.level_for("wgpu", log::LevelFilter::Warn)
-        .level_for("rustty",log::LevelFilter::Debug)
+        .level_for("rustty", log::LevelFilter::Debug)
         .chain(std::io::stdout())
         .chain(fern::log_file("logs/terminal_app.log").expect("Erreur fichier log"));
 
@@ -83,7 +81,6 @@ pub fn main() -> iced::Result {
 
                     async move {
                         if let Some(mut rx) = rx_opt {
-
                             while let Some(log_msg) = rx.recv().await {
                                 let _ = output.send(Message::LogReceived(log_msg)).await;
                             }

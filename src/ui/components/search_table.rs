@@ -6,14 +6,13 @@ use iced::{Element, Font, Length, font};
 
 pub fn header<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     column![
-
-        text_input("🔍 Recherche rapide sur nom, groupe, ip, utilisateur", &app.search_query)
-            .on_input(|v| Message::Profile(ProfileMessage::SearchChanged(v)))
-            .padding(10)
-            .style(move |theme: &iced::Theme, status| {
-                theme::input_style(colors, status)
-            }),
-
+        text_input(
+            "🔍 Recherche rapide sur nom, groupe, ip, utilisateur",
+            &app.search_query
+        )
+        .on_input(|v| Message::Profile(ProfileMessage::SearchChanged(v)))
+        .padding(10)
+        .style(move |_theme: &iced::Theme, status| { theme::input_style(colors, status) }),
         container(
             row![
                 bold_text("GROUPE").width(Length::FillPortion(1)),
@@ -27,27 +26,27 @@ pub fn header<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message
         .style(move |_theme| {
             container::Style {
                 background: Some(colors.bg.into()),
-                text_color: Some(colors.text.into()),
+                text_color: Some(colors.text),
                 ..Default::default()
             }
         })
     ]
-    .spacing(20) 
+    .spacing(20)
     .into()
 }
 
-// <'a> means that provided MyApp reference 
+// <'a> means that provided MyApp reference
 // must live at least as long as the produced UI element.
 pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Message> {
     let mut content = column![].spacing(1);
     let query = app.search_query.to_lowercase();
 
     for (i, profile) in app.profiles.iter().enumerate() {
-        let is_match = query.is_empty() 
-            || profile.name.to_lowercase().contains(&query) 
-            || profile.group.to_lowercase().contains(&query) 
-            || profile.ip.contains(&query)          
-            || profile.username.to_lowercase().contains(&query); 
+        let is_match = query.is_empty()
+            || profile.name.to_lowercase().contains(&query)
+            || profile.group.to_lowercase().contains(&query)
+            || profile.ip.contains(&query)
+            || profile.username.to_lowercase().contains(&query);
         if is_match {
             let is_selected = app.selected_profile_id == Some(profile.id);
             let zebra_color = if i % 2 == 0 {
@@ -72,7 +71,8 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
                 .width(Length::Fill)
                 .on_press(Message::Profile(ProfileMessage::Selected(profile.id)))
                 .style(move |_, status| {
-                    let mut st = theme::button_style(colors, status,theme::ButtonVariant::Secondary);
+                    let mut st =
+                        theme::button_style(colors, status, theme::ButtonVariant::Secondary);
                     if is_selected {
                         st.background = Some(colors.prompt.into());
                         st.text_color = colors.accent;
@@ -91,9 +91,8 @@ pub fn content<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, Messag
     scrollable(content).height(Length::Fixed(150.0)).into()
 }
 
-
 // helper for bold text in the header
-fn bold_text(content: &str) -> text::Text {
+fn bold_text(content: &str) -> text::Text<'_> {
     text(content).font(Font {
         weight: font::Weight::Bold,
         ..Default::default()

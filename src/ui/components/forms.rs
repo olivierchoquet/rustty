@@ -95,6 +95,7 @@ pub fn general_form<'a>(app: &'a MyApp, colors: TerminalColors) -> Element<'a, M
     .into()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_input_with_label<'a>(
     label: &'a str,
     value: &'a str,
@@ -108,7 +109,7 @@ fn render_input_with_label<'a>(
     let mut col = column![
         // label
         text(label).size(13).style(move |_| text::Style {
-            color: Some(colors.text.into())
+            color: Some(colors.text)
         }),
         // input
         text_input(label, value)
@@ -125,7 +126,7 @@ fn render_input_with_label<'a>(
     // optional text helper below the input (e.g., for password warning)
     if let Some(help) = helper_text {
         col = col.push(text(help).size(11).style(move |_| text::Style {
-            color: Some(colors.prompt.into()),
+            color: Some(colors.prompt),
         }));
     }
 
@@ -149,11 +150,9 @@ pub fn terminal_count_selector<'a>(
             current_count.saturating_sub(1).max(1)
         )))
         .width(35),
-
         container(text(current_count.to_string()).color(colors.text).size(18))
             .width(40)
             .align_x(Horizontal::Center),
-
         button(
             text("+")
                 .align_x(Horizontal::Center)
@@ -284,8 +283,8 @@ pub fn theme_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Messag
     .into()
 }
 
-pub fn help_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Message> {
-     column![
+pub fn help_form<'a>(_app: &MyApp, colors: TerminalColors) -> Element<'a, Message> {
+    column![
         text("AIDE")
             .size(18)
             .font(Font {
@@ -293,21 +292,23 @@ pub fn help_form<'a>(app: &MyApp, colors: TerminalColors) -> Element<'a, Message
                 ..Font::default()
             })
             .color(colors.accent),
+        row![text("Auteur : Olivier Choquet").size(16).color(colors.text),],
         row![
-            text("Auteur : Olivier Choquet")
-            .size(16)
-            .color(colors.text),
-        ],
-        row![
-            button(text("https://github.com/olivierchoquet/rustty").color(Color::from_rgb(0.0, 0.4, 1.0)))
-                .on_press(Message::OpenUrl("https://github.com/olivierchoquet/rustty".to_string()))
-                .style(button::text) 
+            button(
+                text("https://github.com/olivierchoquet/rustty")
+                    .color(Color::from_rgb(0.0, 0.4, 1.0))
+            )
+            .on_press(Message::OpenUrl(
+                "https://github.com/olivierchoquet/rustty".to_string()
+            ))
+            .style(button::text)
         ],
         row![
             text("Issues ou Pull Requests peuvent être créées sur le dépôt GitHub")
-            .size(16)
-            .color(colors.text),
+                .size(16)
+                .color(colors.text),
         ]
-         
-    ].spacing(15).into()
+    ]
+    .spacing(15)
+    .into()
 }

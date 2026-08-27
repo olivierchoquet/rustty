@@ -1,5 +1,5 @@
 use iced::widget::{button, container, text_input};
-use iced::{Border, Color, Shadow};
+use iced::{Border, Color};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -21,7 +21,6 @@ pub enum ThemeChoice {
     Everforest, // Organic greens, ultra-relaxing
     RoséPine,   // Muted tones, very “design”
     AyuMirage,  // A perfect in-between, modern and readable
-
 }
 
 impl ThemeChoice {
@@ -185,7 +184,6 @@ pub struct TerminalColors {
     pub surface: Color,
 }
 
-
 // Default == Slate Theme
 impl Default for TerminalColors {
     fn default() -> Self {
@@ -206,7 +204,6 @@ pub enum ButtonVariant {
     Danger, // Optionnal for destructive actions
 }
 
-
 // --- STYLE FUNCTIONS ---
 
 pub fn button_style(
@@ -214,7 +211,6 @@ pub fn button_style(
     status: button::Status,
     variant: ButtonVariant,
 ) -> button::Style {
-
     let (bg_base, txt_color) = match variant {
         ButtonVariant::Primary => (colors.accent, colors.bg),
         ButtonVariant::Secondary => (colors.surface, colors.text),
@@ -233,7 +229,11 @@ pub fn button_style(
         text_color: txt_color,
         border: Border {
             radius: 6.0.into(),
-            width: if let ButtonVariant::Secondary = variant { 1.0 } else { 0.0 },
+            width: if let ButtonVariant::Secondary = variant {
+                1.0
+            } else {
+                0.0
+            },
             color: colors.accent,
         },
         ..Default::default()
@@ -267,4 +267,3 @@ pub fn main_container_style(colors: TerminalColors) -> container::Style {
         ..Default::default()
     }
 }
-
