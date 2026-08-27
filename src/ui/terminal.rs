@@ -1,15 +1,9 @@
-use std::os::linux::raw;
-
 use crate::messages::{ConfigMessage, SshMessage};
-use crate::ui::theme::{self, TerminalColors, ThemeChoice};
-use crate::ui::{
-    ID_IP, ID_PASS, ID_PORT, ID_USER, MAX_TERMINAL_LINES, Message, MyApp,
-};
+use crate::ui::theme::{TerminalColors, ThemeChoice};
+use crate::ui::{Message, MyApp};
 
-use iced::keyboard::key::Named;
-use iced::keyboard::{Key, Modifiers};
-use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input};
-use iced::{Alignment, Element, Length, Task};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text};
+use iced::{Alignment, Element, Length};
 use vt100;
 
 pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> {
@@ -30,15 +24,15 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
     let (rows, cols) = screen.size();
     let (cursor_row, cursor_col) = screen.cursor_position();
 
-    let tab_colors = colors.clone();
-    let status_colors = colors.clone();
+    let tab_colors = colors;
+    let status_colors = colors;
     let bg_color_final = colors.bg;
 
     // --- 1. TAB ZONE ---
     let tab_bar = container(
         row![
             container(
-                text(format!(" 🐚 {} ", &app.current_profile.ip))
+                text(format!(" 🐚 {} ", app.current_profile.ip))
                     .size(13)
                     .font(iced::Font::MONOSPACE)
                     .color(colors.text)
@@ -86,7 +80,7 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
                 let mut current_fg = vt100::Color::Default;
 
                 for col_idx in 0..cols {
-                    let is_cursor = row_idx as u16 == cursor_row && col_idx as u16 == cursor_col;
+                    let is_cursor = row_idx == cursor_row && col_idx == cursor_col;
 
                     if let Some(cell) = screen.cell(row_idx, col_idx) {
                         let fg = cell.fgcolor();
@@ -98,21 +92,16 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
                         };
 
                         if (fg != current_fg || is_cursor) && !current_text.is_empty() {
-
                             line_elements.push(render_text_chunk(
                                 current_text.clone(),
                                 current_fg,
-                                colors.clone(),
+                                colors,
                             ));
                             current_text.clear();
                         }
 
                         if is_cursor {
-                            line_elements.push(render_cursor(
-                                display_char.to_string(),
-                                fg,
-                                colors.clone(),
-                            ));
+                            line_elements.push(render_cursor(display_char.to_string(), fg, colors));
                             current_fg = fg;
                         } else {
                             current_fg = fg;
@@ -122,7 +111,7 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
                 }
 
                 if !current_text.is_empty() {
-                    line_elements.push(render_text_chunk(current_text, current_fg, colors.clone()));
+                    line_elements.push(render_text_chunk(current_text, current_fg, colors));
                 }
 
                 row(line_elements).spacing(0).into()
@@ -144,9 +133,9 @@ pub fn render(app: &MyApp, window_id: iced::window::Id) -> Element<'_, Message> 
     .height(Length::Fill);
 
     let interactive_terminal = button(terminal_scroll)
-    .padding(0)
-    .style(iced::widget::button::secondary) // Ou un style transparent personnalisé
-    .on_press(Message::Ssh(SshMessage::WindowFocused(window_id)));
+        .padding(0)
+        .style(iced::widget::button::secondary) // Ou un style transparent personnalisé
+        .on_press(Message::Ssh(SshMessage::WindowFocused(window_id)));
 
     // --- 3. STATE BAR (Footer) ---
     let status_bar = container(
@@ -226,9 +215,8 @@ fn vt_to_iced_color(
     theme_colors: &crate::ui::theme::TerminalColors,
 ) -> iced::Color {
     match vt_color {
-        vt100::Color::Default => theme_colors.text, 
+        vt100::Color::Default => theme_colors.text,
         vt100::Color::Idx(i) => {
-
             match i {
                 0 => iced::Color::from_rgb8(0, 0, 0),       // Black
                 1 => iced::Color::from_rgb8(205, 0, 0),     // Red
@@ -244,4 +232,3 @@ fn vt_to_iced_color(
         vt100::Color::Rgb(r, g, b) => iced::Color::from_rgb8(r, g, b),
     }
 }
-

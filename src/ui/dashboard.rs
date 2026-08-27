@@ -1,12 +1,15 @@
 use iced::{
-    Color, Element, Font, Length, border, font::Weight, widget::{column, container, horizontal_rule, row, text, vertical_space}
+    Color, Element, Font, Length, border,
+    font::Weight,
+    widget::{column, container, horizontal_rule, row, text, vertical_space},
 };
 
 use crate::ui::components::{actions_bar, forms::help_form, sidebar};
 use crate::{
     messages::Message,
     ui::{
-        EditSection, MyApp, components::{
+        EditSection, MyApp,
+        components::{
             forms::{general_form, theme_form},
             search_table::{content, header},
         },
@@ -64,7 +67,7 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
         .spacing(20)
         .into(),*/
         EditSection::Themes => column![theme_form(app, colors),].spacing(20).into(),
-        EditSection::Help => column![help_form(app,colors)].spacing(20).into(),
+        EditSection::Help => column![help_form(app, colors)].spacing(20).into(),
 
         _ => column![text("Section en cours de développement...").color(colors.text),]
             .spacing(20)
@@ -82,7 +85,7 @@ pub fn render(app: &MyApp) -> Element<'_, Message> {
                     brand_header,
                     vertical_space().height(10),
                     container(dynamic_content)
-                        .height(Length::Fill) 
+                        .height(Length::Fill)
                         .width(Length::Fill),
                     logs_panel,
                 ]
@@ -112,7 +115,7 @@ pub fn log_view<'a>(
                 let log_color = if l.contains("ERROR") || l.contains("Échec") {
                     Color::from_rgb(1.0, 0.4, 0.4) // ERROR always red
                 } else if l.contains("INFO") {
-                    colors.accent 
+                    colors.accent
                 } else {
                     colors.text
                 };
@@ -131,14 +134,15 @@ pub fn log_view<'a>(
         .height(Length::Fixed(200.0)) // Fixe pour être sûr qu'il ne disparaisse pas
         .padding(10)
         .style(move |_| container::Style {
-            background: Some(Color {
+            background: Some(
+                Color {
                     a: 0.05,
                     ..colors.accent
-            }.into()),
-            border: border::rounded(5)
-                .width(1.0)
-                .color(colors.accent),
-                
+                }
+                .into(),
+            ),
+            border: border::rounded(5).width(1.0).color(colors.accent),
+
             ..Default::default()
         })
         .into()

@@ -1,5 +1,5 @@
+use iced::keyboard::Key;
 use iced::keyboard::key::Named;
-use iced::keyboard::{Key, Modifiers};
 use iced::widget::{scrollable, text_input};
 use iced::{Element, Task, window};
 use std::collections::HashMap;
@@ -77,7 +77,7 @@ impl MyApp {
             parsers: HashMap::new(),
             active_channels: HashMap::new(),
             profiles: Profile::load_all(),
-            current_profile: Profile::default(),
+            current_profile: Profile::new(),
             selected_profile_id: None,
             search_query: "".into(),
             active_section: EditSection::General,
@@ -154,7 +154,7 @@ impl MyApp {
             let close_task = if let Some(ch_arc) = channel_to_close {
                 Task::perform(
                     async move {
-                        let mut ch = ch_arc.lock().await;
+                        let ch = ch_arc.lock().await;
                         let _ = ch.close().await;
                     },
                     |_| Message::DoNothing,
@@ -337,52 +337,50 @@ impl MyApp {
     }
 
     fn handle_keyboard_event(&mut self, event: iced::Event) -> Task<Message> {
-        match event {
-            iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
-                key,
-                modifiers,
-                text,
-                ..
-            }) => {
-                // 1. CTRL shortcut
-                if modifiers.control() {
-                    if let Key::Character(ref c) = key {
-                        let b = c.as_bytes();
-                        if !b.is_empty() {
-                            return self.send_to_terminal(vec![b[0] & 0x1f]);
-                        }
-                    }
-                }
-
-                // 2. TRADUCTED TEXT (dots, commas, etc.)
-                if let Some(t) = text {
-                    let c = t.chars().next().unwrap_or('\0');
-                    if !c.is_control() {
-                        log::debug!("rustty: Texte traduit reçu: '{}'", t);
-                        return self.send_to_terminal(t.as_bytes().to_vec());
-                    }
-                }
-
-                // 3. COMMANDS (Enter, Backspace, Arrow...)
-                if let Key::Named(named) = key {
-                    let bytes = match named {
-                        Named::Enter => Some(vec![13]),
-                        Named::Backspace => Some(vec![127]),
-                        Named::Tab => Some(vec![9]),
-                        Named::Escape => Some(vec![27]),
-                        Named::ArrowUp => Some(vec![27, 91, 65]),
-                        Named::ArrowDown => Some(vec![27, 91, 66]),
-                        Named::ArrowRight => Some(vec![27, 91, 67]),
-                        Named::ArrowLeft => Some(vec![27, 91, 68]),
-                        _ => None,
-                    };
-
-                    if let Some(b) = bytes {
-                        return self.send_to_terminal(b);
-                    }
+        if let iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+            key,
+            modifiers,
+            text,
+            ..
+        }) = event
+        {
+            // 1. CTRL shortcut
+            if modifiers.control()
+                && let Key::Character(ref c) = key
+            {
+                let b = c.as_bytes();
+                if !b.is_empty() {
+                    return self.send_to_terminal(vec![b[0] & 0x1f]);
                 }
             }
-            _ => {}
+
+            // 2. TRADUCTED TEXT (dots, commas, etc.)
+            if let Some(t) = text {
+                let c = t.chars().next().unwrap_or('\0');
+                if !c.is_control() {
+                    log::debug!("rustty: Texte traduit reçu: '{}'", t);
+                    return self.send_to_terminal(t.as_bytes().to_vec());
+                }
+            }
+
+            // 3. COMMANDS (Enter, Backspace, Arrow...)
+            if let Key::Named(named) = key {
+                let bytes = match named {
+                    Named::Enter => Some(vec![13]),
+                    Named::Backspace => Some(vec![127]),
+                    Named::Tab => Some(vec![9]),
+                    Named::Escape => Some(vec![27]),
+                    Named::ArrowUp => Some(vec![27, 91, 65]),
+                    Named::ArrowDown => Some(vec![27, 91, 66]),
+                    Named::ArrowRight => Some(vec![27, 91, 67]),
+                    Named::ArrowLeft => Some(vec![27, 91, 68]),
+                    _ => None,
+                };
+
+                if let Some(b) = bytes {
+                    return self.send_to_terminal(b);
+                }
+            }
         }
         Task::none()
     }
@@ -393,17 +391,17 @@ impl MyApp {
             .focused_window_id
             .or_else(|| self.terminal_window_ids.last().cloned());
 
-        if let Some(window_id) = target_window_id {
-            if let Some(channel_arc) = self.active_channels.get(&window_id) {
-                let arc = channel_arc.clone();
-                return Task::perform(
-                    async move {
-                        let mut ch = arc.lock().await;
-                        let _ = ch.data(&bytes[..]).await;
-                    },
-                    |_| Message::DoNothing,
-                );
-            }
+        if let Some(window_id) = target_window_id
+            && let Some(channel_arc) = self.active_channels.get(&window_id)
+        {
+            let arc = channel_arc.clone();
+            return Task::perform(
+                async move {
+                    let ch = arc.lock().await;
+                    let _ = ch.data(&bytes[..]).await;
+                },
+                |_| Message::DoNothing,
+            );
         }
         Task::none()
     }
@@ -434,7 +432,7 @@ impl MyApp {
 
             ProfileMessage::New => {
                 self.selected_profile_id = None;
-                self.current_profile = Profile::default();
+                self.current_profile = Profile::new();
             }
 
             ProfileMessage::Delete => {
@@ -442,7 +440,7 @@ impl MyApp {
                     log::warn!("rustty: Suppression du profil ID: {}", id);
                     self.profiles.retain(|p| p.id != id);
                     self.selected_profile_id = None;
-                    self.current_profile = Profile::default();
+                    self.current_profile = Profile::new();
                     self.save_profiles();
                 }
             }
@@ -480,5 +478,152 @@ impl MyApp {
         self.profiles
             .sort_by(|a, b| a.group.cmp(&b.group).then(a.name.cmp(&b.name)));
         self.save_profiles();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::messages::{LoginMessage, Message, ProfileMessage, SshMessage};
+    use iced::window;
+
+    fn setup_app() -> MyApp {
+        MyApp::new(window::Id::unique())
+    }
+
+    // --- LOGIC TESTS ---
+
+    #[test]
+    fn test_login_and_ip_validation() {
+        let mut app = setup_app();
+        let test_ip = "192.168.1.1".to_string();
+
+        // Test Input
+        let _ = app.update(Message::Login(LoginMessage::InputIP(test_ip.clone())));
+        assert_eq!(app.current_profile.ip, test_ip);
+
+        // Test Submit Validation (Failure)
+        let _ = app.update(Message::Login(LoginMessage::Submit));
+        assert!(app.terminal_window_ids.is_empty());
+
+        // Test Submit Validation (Success state reset)
+        let _ = app.update(Message::Login(LoginMessage::InputUsername("test".into())));
+        let _ = app.update(Message::Login(LoginMessage::InputPort("22".into())));
+        app.spawn_index = 5;
+        let _ = app.update(Message::Login(LoginMessage::Submit));
+        assert_eq!(app.spawn_index, 0);
+    }
+
+    #[test]
+    fn test_log_rotation() {
+        let mut app = setup_app();
+        for i in 0..150 {
+            let _ = app.update(Message::LogReceived(format!("Log {}", i)));
+        }
+        assert_eq!(app.logs.len(), 100);
+        assert_eq!(app.logs[0], "Log 149");
+    }
+
+    // --- PROFILE & SIDEBAR TESTS ---
+
+    #[test]
+    fn test_profile_lifecycle() {
+        let mut app = setup_app();
+        app.profiles.clear();
+        let p_id = uuid::Uuid::new_v4();
+
+        // 1. Creation & Selection
+        let mut p = Profile::new();
+        p.id = p_id;
+        p.name = "Prod Server".into();
+        app.profiles.push(p);
+        let _ = app.update(Message::Profile(ProfileMessage::Selected(p_id)));
+        assert_eq!(app.current_profile.name, "Prod Server");
+
+        // 2. Deletion
+        let _ = app.update(Message::Profile(ProfileMessage::Delete));
+        assert!(app.profiles.is_empty());
+        assert_eq!(app.selected_profile_id, None);
+    }
+
+    #[test]
+    fn test_sidebar_and_search_logic() {
+        let mut app = setup_app();
+        app.profiles.clear();
+
+        // 1. Search filtering
+        let p1 = Profile {
+            name: "Production".into(),
+            group: "INFRA".into(),
+            ..Default::default()
+        };
+        app.profiles.push(p1);
+        let _ = app.update(Message::Profile(ProfileMessage::SearchChanged(
+            "Prod".into(),
+        )));
+
+        // 2. Group interaction
+        let _ = app.update(Message::Profile(ProfileMessage::InputGroup(
+            "INFRA-TEAM".into(),
+        )));
+
+        // 3. UI rendering for these states
+        let _ = app.view(app.login_window_id.unwrap());
+        assert_eq!(app.current_profile.group, "INFRA-TEAM");
+    }
+
+    // --- UI & THEME TESTS ---
+
+    #[test]
+    fn test_theme_exhaustive_coverage() {
+        let mut app = setup_app();
+        for &choice in &crate::ui::theme::ThemeChoice::ALL {
+            let _ = app.update(Message::Config(
+                crate::messages::ConfigMessage::ThemeChanged(choice),
+            ));
+            let colors = choice.get_colors();
+
+            // Technical style coverage
+            let _ = crate::ui::theme::button_style(
+                colors,
+                iced::widget::button::Status::Active,
+                crate::ui::theme::ButtonVariant::Primary,
+            );
+            let _ =
+                crate::ui::theme::input_style(colors, iced::widget::text_input::Status::Focused);
+            let _ = crate::ui::theme::main_container_style(colors);
+
+            let _ = app.view(app.login_window_id.unwrap());
+            assert!(!format!("{}", choice).is_empty());
+        }
+    }
+
+    #[test]
+    fn test_terminal_parsing_and_rendering() {
+        let mut app = setup_app();
+        let term_id = window::Id::unique();
+        app.terminal_window_ids.push(term_id);
+
+        // Complex ANSI sequences to trigger the parser
+        let complex_data = vec![
+            b"\x1b[31mRed Alert!\x1b[0m\n".to_vec(),
+            b"\x1b[1mBold\x1b[0m\n".to_vec(),
+            b"\x1b[2J\x1b[H".to_vec(),
+        ];
+
+        for data in complex_data {
+            let _ = app.update(Message::Ssh(SshMessage::DataReceived(term_id, data)));
+        }
+
+        // Render call
+        let _ = app.view(term_id);
+        assert!(app.terminal_window_ids.contains(&term_id));
+    }
+
+    #[test]
+    fn test_general_view_rendering() {
+        let app = setup_app();
+        // Master key for dashboard and components
+        let _ = app.view(app.login_window_id.unwrap());
     }
 }
